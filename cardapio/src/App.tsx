@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Menu } from './types/menu'
 import { loadMenu, type MenuResult } from './data/menu-source'
 import { byOrder } from './lib/menu'
+import { CategoryNav } from './components/CategoryNav'
 import { CategorySection } from './components/CategorySection'
 
 /**
@@ -49,6 +50,8 @@ function formatUpdatedAt(iso: string): string {
 }
 
 function MenuView({ menu }: { menu: Menu }) {
+  const categories = byOrder(menu.categories)
+
   return (
     <div className="app">
       <header className="header">
@@ -58,8 +61,10 @@ function MenuView({ menu }: { menu: Menu }) {
         </p>
       </header>
 
+      <CategoryNav categories={categories} />
+
       <main className="menu">
-        {byOrder(menu.categories).map((category) => (
+        {categories.map((category) => (
           <CategorySection key={category.id} category={category} />
         ))}
       </main>

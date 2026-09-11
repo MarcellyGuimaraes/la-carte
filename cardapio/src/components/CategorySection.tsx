@@ -8,11 +8,18 @@ type Props = {
 
 /**
  * Uma seção do cardápio: título da categoria e seus itens, na ordem do dono.
+ * O `id` na section é o alvo das âncoras de `CategoryNav`.
  */
 export function CategorySection({ category }: Props) {
+  const headingId = `category-${category.id}-heading`
+
   return (
-    <section className="category" aria-labelledby={`category-${category.id}`}>
-      <h2 className="category__name" id={`category-${category.id}`}>
+    <section
+      className="category"
+      id={`category-${category.id}`}
+      aria-labelledby={headingId}
+    >
+      <h2 className="category__name" id={headingId}>
         {category.name}
       </h2>
       <ul className="category__items">
