@@ -4,6 +4,7 @@ import { loadMenu, type MenuResult } from './data/menu-source'
 import { byOrder } from './lib/menu'
 import { CategoryNav } from './components/CategoryNav'
 import { CategorySection } from './components/CategorySection'
+import { PwaStatus } from './components/PwaStatus'
 
 /**
  * ÚNICA ponte entre dados e apresentação.
@@ -41,6 +42,15 @@ export default function App() {
   return <MenuView menu={state.result.menu} />
 }
 
+/**
+ * O diagnóstico da PWA não aparece para o cliente na mesa. Só em
+ * desenvolvimento, ou quando a URL traz ?debug — útil para conferir o offline
+ * em produção, no celular, sem DevTools.
+ */
+function showDiagnostics(): boolean {
+  return import.meta.env.DEV || new URLSearchParams(window.location.search).has("debug")
+}
+
 function formatUpdatedAt(iso: string): string {
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
@@ -71,6 +81,7 @@ function MenuView({ menu }: { menu: Menu }) {
 
       <footer className="footer">
         <p>Preços sujeitos a alteração. Consulte o garçom.</p>
+        {showDiagnostics() && <PwaStatus />}
       </footer>
     </div>
   )
