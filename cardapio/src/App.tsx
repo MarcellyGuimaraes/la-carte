@@ -1,16 +1,44 @@
+import { useEffect, useState } from 'react'
 import type { Menu } from './types/menu'
-import { menuFixture } from './data/menu-fixture'
+import { loadMenu, type MenuResult } from './data/menu-source'
 import { byOrder } from './lib/menu'
 import { CategorySection } from './components/CategorySection'
 
 /**
  * ÚNICA ponte entre dados e apresentação.
  *
- * Hoje o cardápio vem de um módulo fixo. Quando o endpoint Laravel existir,
- * só este arquivo muda: `menuFixture` vira o resultado de um fetch cacheado.
- * Nenhum componente abaixo daqui sabe a origem dos dados.
+ * Consome o cardápio de forma assíncrona, como se já viesse da API. Quem
+ * fornece os dados é `data/menu-source.ts`; este componente não sabe se a
+ * origem é um módulo fixo, um fetch ou o cache do service worker.
  */
-const menu: Menu = menuFixture
+
+type State = { status: 'loading' } | { status: 'done'; result: MenuResult }
+
+export default function App() {
+  const [state, setState] = useState<State>({ status: 'loading' })
+
+  useEffect(() => {
+    let cancelled = false
+
+    loadMenu().then((result) => {
+      if (!cancelled) setState({ status: 'done', result })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (state.status === 'loading') {
+    return <p className="feedback">Carregando cardápio…</p>
+  }
+
+  if (!state.result.ok) {
+    return <p className="feedback">{state.result.error}</p>
+  }
+
+  return <MenuView menu={state.result.menu} />
+}
 
 function formatUpdatedAt(iso: string): string {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -20,7 +48,7 @@ function formatUpdatedAt(iso: string): string {
   }).format(new Date(iso))
 }
 
-export default function App() {
+function MenuView({ menu }: { menu: Menu }) {
   return (
     <div className="app">
       <header className="header">
