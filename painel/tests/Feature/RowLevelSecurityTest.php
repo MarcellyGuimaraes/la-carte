@@ -2,53 +2,29 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Resources\Categories\Pages\CreateCategory;
 use App\Http\Middleware\SetPostgresTenant;
 use App\Models\Item;
-use App\Models\Tenant;
 use App\Models\User;
-use Filament\Facades\Filament;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use Livewire\Livewire;
+use Tests\Concerns\WithTwoTenants;
 use Tests\TestCase;
 
 /**
  * Isolamento entre restaurantes no nível do banco, não do painel.
- *
- * Os dados são criados pela conexão do dono (ignora RLS) e as verificações
- * rodam pela conexão da aplicação (presa à RLS), a mesma que atende request.
- *
- * Sem RefreshDatabase: ele roda tudo numa transação da conexão padrão, e a
- * conexão do app não enxergaria o que o dono gravou numa transação aberta.
- * Cada teste recria os dados com TRUNCATE.
+ * O equivalente pelo painel está em AdminPanelTenancyTest.
  */
 class RowLevelSecurityTest extends TestCase
 {
-    private static bool $migrated = false;
-
-    private int $tonho;
-
-    private int $nona;
+    use WithTwoTenants;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        if (! self::$migrated) {
-            Artisan::call('migrate:fresh', ['--database' => 'pgsql_owner']);
-            self::$migrated = true;
-        }
-
-        $owner = DB::connection('pgsql_owner');
-        /* CASCADE leva junto categories, items, links e users. */
-        $owner->statement('TRUNCATE tenants RESTART IDENTITY CASCADE');
-
-        $this->tonho = $this->createTenant('bar-do-tonho', itemCount: 3);
-        $this->nona = $this->createTenant('pizzaria-da-nona', itemCount: 2);
+        $this->setUpTwoTenants();
     }
 
     public function test_application_connection_is_not_privileged(): void
@@ -130,12 +106,7 @@ class RowLevelSecurityTest extends TestCase
 
     public function test_middleware_sets_tenant_from_authenticated_user(): void
     {
-        $owner = User::on('pgsql_owner')->create([
-            'tenant_id' => $this->nona,
-            'name' => 'Nona',
-            'email' => 'nona@exemplo.com',
-            'password' => 'segredo123',
-        ]);
+        $owner = $this->createUser($this->nona);
 
         $request = Request::create('/admin');
         $request->setUserResolver(fn () => $owner);
@@ -163,105 +134,5 @@ class RowLevelSecurityTest extends TestCase
 
             return new Response;
         });
-    }
-
-    public function test_panel_lists_only_items_of_the_logged_in_tenant(): void
-    {
-        $this->renameFirstItem($this->nona, 'Margherita da Nona');
-
-        $this->actingAs($this->createUser($this->tonho))
-            ->get('/admin/bar-do-tonho/items')
-            ->assertOk()
-            ->assertSee('Item 1')
-            ->assertDontSee('Margherita da Nona');
-    }
-
-    public function test_panel_denies_another_tenant_slug_in_url(): void
-    {
-        $this->actingAs($this->createUser($this->tonho))
-            ->get('/admin/pizzaria-da-nona/items')
-            ->assertNotFound();
-    }
-
-    public function test_panel_creates_category_in_the_logged_in_tenant(): void
-    {
-        /*
-         * Livewire::test não passa pelos middlewares da rota, então o que
-         * SetPostgresTenant, IdentifyTenant e SetUpPanel fariam vai à mão.
-         * bootCurrentPanel registra o observer que preenche o tenant_id.
-         */
-        $this->actAsTenant($this->tonho);
-        $this->actingAs($this->createUser($this->tonho));
-        Filament::setCurrentPanel('admin');
-        Filament::setTenant(Tenant::findOrFail($this->tonho));
-        Filament::bootCurrentPanel();
-
-        Livewire::test(CreateCategory::class)
-            ->fillForm(['name' => 'Sobremesas', 'sort_order' => 5])
-            ->call('create')
-            ->assertHasNoFormErrors();
-
-        $created = DB::connection('pgsql_owner')->table('categories')
-            ->where('name', 'Sobremesas')
-            ->first();
-        $this->assertSame($this->tonho, $created->tenant_id);
-    }
-
-    private function createUser(int $tenantId): User
-    {
-        return User::on('pgsql_owner')->create([
-            'tenant_id' => $tenantId,
-            'name' => "Dono {$tenantId}",
-            'email' => "dono{$tenantId}@exemplo.com",
-            'password' => 'segredo123',
-        ])->setConnection('pgsql');
-    }
-
-    private function renameFirstItem(int $tenantId, string $name): void
-    {
-        DB::connection('pgsql_owner')->table('items')
-            ->where('tenant_id', $tenantId)
-            ->orderBy('id')
-            ->limit(1)
-            ->update(['name' => $name]);
-    }
-
-    private function actAsTenant(int $tenantId): void
-    {
-        DB::select("select set_config('app.current_tenant', ?, false)", [(string) $tenantId]);
-    }
-
-    private function createTenant(string $slug, int $itemCount): int
-    {
-        $owner = DB::connection('pgsql_owner');
-        $now = now();
-
-        $tenantId = $owner->table('tenants')->insertGetId([
-            'name' => $slug,
-            'slug' => $slug,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-
-        $categoryId = $owner->table('categories')->insertGetId([
-            'tenant_id' => $tenantId,
-            'name' => 'Categoria',
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-
-        foreach (range(1, $itemCount) as $order) {
-            $owner->table('items')->insert([
-                'tenant_id' => $tenantId,
-                'category_id' => $categoryId,
-                'name' => "Item {$order}",
-                'price_cents' => 1000,
-                'sort_order' => $order,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-        }
-
-        return $tenantId;
     }
 }

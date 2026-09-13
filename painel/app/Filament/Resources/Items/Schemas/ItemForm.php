@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Items\Schemas;
 
+use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -59,7 +60,11 @@ class ItemForm
                     ->label('Foto')
                     ->image()
                     ->disk('public')
-                    ->directory('itens')
+                    /*
+                     * Uma pasta por restaurante: dá para achar, medir e apagar
+                     * as fotos de um cliente sem varrer as dos outros.
+                     */
+                    ->directory(fn (): string => 'itens/'.Filament::getTenant()->getKey())
                     ->maxSize(4096)
                     ->helperText('Some com a foto se o prato não tiver uma boa. Foto ruim vende menos que nenhuma.'),
                 Toggle::make('featured')

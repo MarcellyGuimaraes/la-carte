@@ -8,29 +8,14 @@
 --
 -- Os ERROR saem pelo stderr e podem aparecer uma linha fora de ordem no terminal.
 --
--- Pré-requisito: migrate:fresh + seed (tenant 1 = Bar do Tonho; a Nona vira o 2).
+-- Pré-requisito: php artisan migrate:fresh --seed --database=pgsql_owner
+-- (tenant 1 = Bar do Tonho, 18 itens; tenant 2 = Pizzaria da Nona, 5 itens).
 -- Compare cada resultado com o "ESPERADO" impresso logo acima dele.
 
 \set ON_ERROR_STOP off
 \pset footer off
 
--- 1) Como DONO (superuser, ignora RLS): garante um 2º restaurante com dados.
-\echo '== [dono] criando o 2º restaurante (Pizzaria da Nona) =='
-INSERT INTO tenants (name, slug, plan, active, created_at, updated_at)
-VALUES ('Pizzaria da Nona', 'pizzaria-da-nona', 'free', true, now(), now())
-ON CONFLICT (slug) DO NOTHING;
-
-INSERT INTO categories (tenant_id, name, sort_order, created_at, updated_at)
-SELECT id, 'Pizzas', 1, now(), now() FROM tenants t
-WHERE slug = 'pizzaria-da-nona'
-  AND NOT EXISTS (SELECT 1 FROM categories c WHERE c.tenant_id = t.id);
-
-INSERT INTO items (tenant_id, category_id, name, price_cents, sort_order, created_at, updated_at)
-SELECT c.tenant_id, c.id, 'Margherita', 5900, 1, now(), now()
-FROM categories c JOIN tenants t ON t.id = c.tenant_id
-WHERE t.slug = 'pizzaria-da-nona'
-  AND NOT EXISTS (SELECT 1 FROM items i WHERE i.tenant_id = t.id);
-
+-- 1) Como DONO (superuser, ignora RLS).
 \echo 'ESPERADO: superuser vê os 2 restaurantes (prova de que os dados existem)'
 SELECT id, slug, (SELECT count(*) FROM items i WHERE i.tenant_id = t.id) AS itens
 FROM tenants t ORDER BY id;
@@ -80,7 +65,7 @@ SELECT count(*) FROM items;
 RESET row_security;
 
 \echo ''
-\echo 'ESPERADO: tenant = Pizzaria da Nona -> só pizzaria-da-nona, 1 item (Margherita intacta, 5900)'
+\echo 'ESPERADO: tenant = Pizzaria da Nona -> só pizzaria-da-nona, 5 itens (Margherita intacta, 5900)'
 SELECT set_config('app.current_tenant', '2', false) AS tenant_atual;
 SELECT id, slug FROM tenants;
 SELECT name, price_cents FROM items;
