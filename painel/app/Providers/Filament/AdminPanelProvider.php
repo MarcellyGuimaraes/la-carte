@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Http\Middleware\SetPostgresTenant;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -54,6 +55,11 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ]);
+                /*
+                 * Persistente para valer também nas requests do Livewire
+                 * (salvar, filtrar, paginar), não só no carregamento da página.
+                 */
+                SetPostgresTenant::class,
+            ], isPersistent: true);
     }
 }

@@ -1,0 +1,34 @@
+# Infra de desenvolvimento local do La Carte.
+# Subir:   docker compose up -d
+# Parar:   docker compose down        (mantém os dados)
+# Zerar:   docker compose down -v     (apaga o volume, banco volta vazio)
+
+services:
+  postgres:
+    # Major fixada = a mesma de produção. Minor (18.x) recebe só correções.
+    image: postgres:18
+    container_name: la-carte-postgres
+    restart: unless-stopped
+    environment:
+      # Credenciais APENAS de dev. Este usuário é superuser do Postgres.
+      POSTGRES_USER: la_carte
+      POSTGRES_PASSWORD: la_carte_dev
+      POSTGRES_DB: la_carte
+    ports:
+      # host:container. Só na máquina local (127.0.0.1), não fica exposto na rede.
+      # 5433 no host porque a 5432 já é usada pelo Postgres de outro projeto.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      # A partir do Postgres 18, a imagem espera o volume em /var/lib/postgresql
+      # (e não mais em /var/lib/postgresql/data).
+      - pgdata:/var/lib/postgresql
+      # Scripts rodados só na criação do banco (volume vazio): papéis e banco de teste.
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U la_carte -d la_carte"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
