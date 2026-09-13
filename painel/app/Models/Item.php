@@ -27,6 +27,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class Item extends Model
 {
+    /**
+     * R$ 99.999,99. Acima disso é erro de digitação, e bem abaixo do limite da
+     * coluna integer: sem teto, um valor gigante virava erro 500 do Postgres.
+     */
+    public const MAX_PRICE_CENTS = 9_999_999;
+
+    /** Ordem cabe com folga no integer da coluna (vale também para categoria). */
+    public const MAX_SORT_ORDER = 1_000_000;
+
     /*
      * No model, não no formulário do Filament: qualquer caminho que troque a
      * foto (painel, tinker, seed) gera o WebP igual.
