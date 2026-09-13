@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Items\Pages;
 
+use App\Filament\Actions\PublishMenuAction;
 use App\Filament\Resources\Items\ItemResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
@@ -13,6 +14,7 @@ class ListItems extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            PublishMenuAction::make(),
             CreateAction::make(),
         ];
     }

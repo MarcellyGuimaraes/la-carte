@@ -23,6 +23,13 @@ return [
     'media_disk' => env('MEDIA_DISK', 'public'),
 
     /*
+     * Onde o job de publicação grava v{n}.json e current.json.
+     * Precisa ser um disco s3 (MinIO em dev, R2 em produção): os cache headers
+     * viajam como metadado do objeto, e o disco local os descarta.
+     */
+    'snapshot_disk' => env('SNAPSHOT_DISK', 's3'),
+
+    /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------

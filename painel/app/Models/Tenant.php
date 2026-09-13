@@ -18,6 +18,7 @@ class Tenant extends Model
         return [
             'active' => 'boolean',
             'plan' => Plan::class,
+            'current_version' => 'integer',
         ];
     }
 

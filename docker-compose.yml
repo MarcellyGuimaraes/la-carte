@@ -30,5 +30,48 @@ services:
       timeout: 3s
       retries: 10
 
+  # Object storage S3-compatível: faz o papel do R2 em dev.
+  # Existe para testar os cache headers dos snapshots de verdade. O disco local
+  # do Laravel não guarda Cache-Control; o S3/R2 guarda como metadado do objeto
+  # e devolve como header, que é o que o MinIO também faz.
+  # Imagem do quay.io com release fixada: o MinIO saiu do Docker Hub e o
+  # community edition está em modo de manutenção. Só a API S3 importa aqui.
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: la-carte-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      # Credenciais APENAS de dev.
+      MINIO_ROOT_USER: la_carte
+      MINIO_ROOT_PASSWORD: la_carte_dev
+    ports:
+      - "127.0.0.1:9000:9000" # API S3 (onde os arquivos são servidos)
+      - "127.0.0.1:9001:9001" # console web
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Roda uma vez e sai: cria o bucket e libera leitura anônima, como um bucket
+  # público do R2 atrás do CDN. Escrita continua exigindo credencial.
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+    container_name: la-carte-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+      mc alias set local http://minio:9000 la_carte la_carte_dev &&
+      mc mb --ignore-existing local/la-carte &&
+      mc anonymous set download local/la-carte
+      "
+    restart: "no"
+
 volumes:
   pgdata:
+  miniodata:
