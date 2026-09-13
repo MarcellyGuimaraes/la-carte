@@ -14,6 +14,8 @@ use Filament\Schemas\Schema;
  *
  * Rótulos em português porque quem preenche é o dono do bar. Os nomes de
  * campo continuam em inglês, iguais às colunas e ao contrato JSON.
+ *
+ * Sem campo de restaurante: a tenancy do Filament preenche o tenant_id.
  */
 class ItemForm
 {
@@ -21,10 +23,6 @@ class ItemForm
     {
         return $schema
             ->components([
-                Select::make('tenant_id')
-                    ->label('Restaurante')
-                    ->relationship('tenant', 'name')
-                    ->required(),
                 Select::make('category_id')
                     ->label('Categoria')
                     ->relationship('category', 'name')

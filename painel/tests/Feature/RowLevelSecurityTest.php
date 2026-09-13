@@ -2,14 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\Categories\Pages\CreateCategory;
 use App\Http\Middleware\SetPostgresTenant;
 use App\Models\Item;
+use App\Models\Tenant;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -159,6 +163,67 @@ class RowLevelSecurityTest extends TestCase
 
             return new Response;
         });
+    }
+
+    public function test_panel_lists_only_items_of_the_logged_in_tenant(): void
+    {
+        $this->renameFirstItem($this->nona, 'Margherita da Nona');
+
+        $this->actingAs($this->createUser($this->tonho))
+            ->get('/admin/bar-do-tonho/items')
+            ->assertOk()
+            ->assertSee('Item 1')
+            ->assertDontSee('Margherita da Nona');
+    }
+
+    public function test_panel_denies_another_tenant_slug_in_url(): void
+    {
+        $this->actingAs($this->createUser($this->tonho))
+            ->get('/admin/pizzaria-da-nona/items')
+            ->assertNotFound();
+    }
+
+    public function test_panel_creates_category_in_the_logged_in_tenant(): void
+    {
+        /*
+         * Livewire::test não passa pelos middlewares da rota, então o que
+         * SetPostgresTenant, IdentifyTenant e SetUpPanel fariam vai à mão.
+         * bootCurrentPanel registra o observer que preenche o tenant_id.
+         */
+        $this->actAsTenant($this->tonho);
+        $this->actingAs($this->createUser($this->tonho));
+        Filament::setCurrentPanel('admin');
+        Filament::setTenant(Tenant::findOrFail($this->tonho));
+        Filament::bootCurrentPanel();
+
+        Livewire::test(CreateCategory::class)
+            ->fillForm(['name' => 'Sobremesas', 'sort_order' => 5])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $created = DB::connection('pgsql_owner')->table('categories')
+            ->where('name', 'Sobremesas')
+            ->first();
+        $this->assertSame($this->tonho, $created->tenant_id);
+    }
+
+    private function createUser(int $tenantId): User
+    {
+        return User::on('pgsql_owner')->create([
+            'tenant_id' => $tenantId,
+            'name' => "Dono {$tenantId}",
+            'email' => "dono{$tenantId}@exemplo.com",
+            'password' => 'segredo123',
+        ])->setConnection('pgsql');
+    }
+
+    private function renameFirstItem(int $tenantId, string $name): void
+    {
+        DB::connection('pgsql_owner')->table('items')
+            ->where('tenant_id', $tenantId)
+            ->orderBy('id')
+            ->limit(1)
+            ->update(['name' => $name]);
     }
 
     private function actAsTenant(int $tenantId): void

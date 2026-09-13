@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Http\Middleware\SetPostgresTenant;
+use App\Models\Tenant;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -29,6 +30,12 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            /*
+             * Scoping do painel: URL /admin/{slug}, queries dos resources
+             * filtradas e tenant_id preenchido ao criar. É a primeira barreira;
+             * a RLS no Postgres é a última.
+             */
+            ->tenant(Tenant::class, slugAttribute: 'slug')
             ->colors([
                 'primary' => Color::Amber,
             ])

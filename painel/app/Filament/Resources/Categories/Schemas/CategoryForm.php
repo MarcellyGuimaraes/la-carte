@@ -2,12 +2,13 @@
 
 namespace App\Filament\Resources\Categories\Schemas;
 
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 
 /**
  * Formulário de categoria. Rótulos em português, campos em inglês.
+ *
+ * Sem campo de restaurante: a tenancy do Filament preenche o tenant_id.
  */
 class CategoryForm
 {
@@ -15,10 +16,6 @@ class CategoryForm
     {
         return $schema
             ->components([
-                Select::make('tenant_id')
-                    ->label('Restaurante')
-                    ->relationship('tenant', 'name')
-                    ->required(),
                 TextInput::make('name')
                     ->label('Nome')
                     ->required()

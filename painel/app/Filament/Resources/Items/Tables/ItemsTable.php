@@ -47,10 +47,6 @@ class ItemsTable
                     ->label('Ordem')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('tenant.name')
-                    ->label('Restaurante')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
                     ->label('Atualizado em')
                     ->dateTime('d/m/Y H:i')
