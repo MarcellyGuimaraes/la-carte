@@ -1,9 +1,9 @@
 /**
  * Contrato de dados do cardápio.
  *
- * Estes tipos descrevem EXATAMENTE o JSON que o endpoint Laravel vai servir
- * (snapshot por restaurante, entregue via CDN). Enquanto o backend não existe,
- * `src/data/menu-fixture.ts` satisfaz o mesmo contrato com dados fixos.
+ * Estes tipos descrevem EXATAMENTE o JSON do snapshot v{n}.json que o job
+ * PublishMenu do painel grava no object storage (servido via CDN). Mudou aqui,
+ * muda lá (painel/app/Jobs/PublishMenu.php), e vice-versa.
  *
  * Convenções, alinhadas com o que o Eloquent serializa por padrão:
  * - chaves em snake_case;

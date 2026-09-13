@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
 import type { Menu } from './types/menu'
-import { loadMenu, type MenuResult } from './data/menu-source'
+import { useMenu } from './data/use-menu'
 import { byOrder } from './lib/menu'
+import { slugFromPath } from './lib/slug'
 import { CategoryNav } from './components/CategoryNav'
 import { CategorySection } from './components/CategorySection'
 import { PwaStatus } from './components/PwaStatus'
@@ -9,37 +9,32 @@ import { PwaStatus } from './components/PwaStatus'
 /**
  * ÚNICA ponte entre dados e apresentação.
  *
- * Consome o cardápio de forma assíncrona, como se já viesse da API. Quem
- * fornece os dados é `data/menu-source.ts`; este componente não sabe se a
- * origem é um módulo fixo, um fetch ou o cache do service worker.
+ * Quem decide de onde vem o cardápio (cache do aparelho, ponteiro, versão
+ * nova) é `data/use-menu.ts`; este componente só desenha o estado.
  */
 
-type State = { status: 'loading' } | { status: 'done'; result: MenuResult }
-
 export default function App() {
-  const [state, setState] = useState<State>({ status: 'loading' })
+  const slug = slugFromPath(window.location.pathname, import.meta.env.BASE_URL)
 
-  useEffect(() => {
-    let cancelled = false
+  if (slug === null) {
+    return <p className="feedback">Escaneie o QR code da mesa para abrir o cardápio.</p>
+  }
 
-    loadMenu().then((result) => {
-      if (!cancelled) setState({ status: 'done', result })
-    })
+  return <MenuScreen slug={slug} />
+}
 
-    return () => {
-      cancelled = true
-    }
-  }, [])
+function MenuScreen({ slug }: { slug: string }) {
+  const state = useMenu(slug)
 
   if (state.status === 'loading') {
     return <p className="feedback">Carregando cardápio…</p>
   }
 
-  if (!state.result.ok) {
-    return <p className="feedback">{state.result.error}</p>
+  if (state.status === 'error') {
+    return <p className="feedback">{state.error}</p>
   }
 
-  return <MenuView menu={state.result.menu} />
+  return <MenuView menu={state.menu} version={state.version} />
 }
 
 /**
@@ -59,7 +54,7 @@ function formatUpdatedAt(iso: string): string {
   }).format(new Date(iso))
 }
 
-function MenuView({ menu }: { menu: Menu }) {
+function MenuView({ menu, version }: { menu: Menu; version: number }) {
   const categories = byOrder(menu.categories)
 
   return (
@@ -81,7 +76,13 @@ function MenuView({ menu }: { menu: Menu }) {
 
       <footer className="footer">
         <p>Preços sujeitos a alteração. Consulte o garçom.</p>
-        {showDiagnostics() && <PwaStatus />}
+        {showDiagnostics() && (
+          <>
+            <PwaStatus />
+            {/* Para conferir no celular qual versão publicada está na tela. */}
+            <p className="pwa-status" data-testid="menu-version">versão publicada: v{version}</p>
+          </>
+        )}
       </footer>
     </div>
   )

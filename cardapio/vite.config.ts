@@ -25,24 +25,34 @@ export default defineConfig({
         navigateFallback: 'index.html',
 
         runtimeCaching: [
+          /*
+           * O cardápio publicado: menus/{slug}/v{n}.json, CacheFirst.
+           *
+           * Um v{n} nunca muda (o painel nunca reescreve um número), então
+           * depois de baixado não há motivo para voltar à rede: responde do
+           * aparelho na hora, com ou sem sinal. É isto que abre offline.
+           * Quem descobre que há versão nova é o current.json, que de
+           * propósito NÃO tem rota aqui: passa direto para a rede, sempre.
+           */
           {
-            /*
-             * O cardápio: stale-while-revalidate.
-             *
-             * Responde na hora com a cópia em cache e, em paralelo, busca a
-             * versão nova para a próxima abertura. A tela nunca espera pela
-             * rede, que é o requisito central em internet ruim. O preço é ver
-             * a versão de ontem nesta visita; `generated_at` deixa isso visível.
-             */
-            urlPattern: ({ url }) => url.pathname.startsWith('/menu/'),
-            handler: 'StaleWhileRevalidate',
+            urlPattern: ({ url }) => /^\/(?:.+\/)?menus\/[a-z0-9-]+\/v\d+\.json$/.test(url.pathname),
+            handler: 'CacheFirst',
             options: {
-              cacheName: 'menu-json',
+              cacheName: 'menu-versions',
               expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 30,
+                /*
+                 * Só por quantidade, nunca por idade: expirar por tempo
+                 * apagaria o único cardápio de quem ficou um mês sem abrir.
+                 * Versões antigas não voltam a ser usadas e saem primeiro.
+                 */
+                maxEntries: 20,
               },
-              cacheableResponse: { statuses: [0, 200] },
+              /*
+               * Só 200. Resposta opaca (status 0) poderia ser um 404 ou erro
+               * disfarçado, e CacheFirst o guardaria para sempre. O bucket
+               * responde com CORS, então a resposta nunca é opaca.
+               */
+              cacheableResponse: { statuses: [200] },
             },
           },
           {
