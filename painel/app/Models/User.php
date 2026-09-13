@@ -16,6 +16,10 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
 
+/*
+ * is_super_admin fica fora do Fillable de propósito: nenhum formulário
+ * consegue promover alguém a dona da plataforma por mass assignment.
+ */
 #[Fillable(['tenant_id', 'name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser, HasTenants
@@ -25,7 +29,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
 
     /**
      * O restaurante a que este usuário pertence.
-     * Nulo significa administrador da plataforma, que enxerga todos.
+     * Nulo só para a super-admin (garantido por CHECK no banco).
      *
      * @return BelongsTo<Tenant, $this>
      */
@@ -35,30 +39,45 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     }
 
     /**
-     * O /admin é do dono de restaurante. Sem isto o Filament bloqueia todo
-     * mundo fora do ambiente local. O /plataforma entra no passo 4.
+     * Quem entra em qual painel. Sem isto o Filament bloqueia todo mundo fora
+     * do ambiente local.
+     *
+     * Roda no Authenticate, antes do SetPostgresTenant: não pode consultar
+     * tabela com RLS aqui (o restaurante viria vazio). Por isso a checagem de
+     * restaurante ativo fica em canAccessTenant.
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $panel->getId() === 'admin' && $this->tenant_id !== null;
+        /*
+         * === true de propósito: model recém-criado não traz o default do banco
+         * (vem null). Na dúvida, a plataforma fica fechada.
+         */
+        return match ($panel->getId()) {
+            'admin' => $this->is_super_admin !== true && $this->tenant_id !== null,
+            'plataforma' => $this->is_super_admin === true,
+            default => false,
+        };
     }
 
     /**
-     * Restaurantes que este usuário pode abrir no painel: só o dele.
-     * Hoje é um restaurante por usuário (coluna, não tabela pivô).
+     * Restaurantes que este usuário pode abrir no /admin: só o dele, e só se
+     * estiver ativo. Hoje é um restaurante por usuário (coluna, não pivô).
      */
     public function getTenants(Panel $panel): Collection
     {
-        return collect([$this->tenant])->filter();
+        return collect([$this->tenant])->filter(fn (?Tenant $tenant) => $tenant?->active);
     }
 
     /**
      * Barreira do Filament contra trocar o slug na URL. A RLS em tenants já
      * esconderia o outro restaurante; esta checagem dá o erro antes.
+     * Restaurante desativado pela plataforma também fecha o painel do dono.
      */
     public function canAccessTenant(Model $tenant): bool
     {
-        return $this->tenant_id !== null && $tenant->getKey() === $this->tenant_id;
+        return $this->tenant_id !== null
+            && $tenant->getKey() === $this->tenant_id
+            && $tenant->active;
     }
 
     /**
@@ -70,6 +89,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     {
         return [
             'tenant_id' => 'integer',
+            'is_super_admin' => 'boolean',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];

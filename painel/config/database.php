@@ -119,6 +119,26 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        /*
+         * Mesmo banco, papel com BYPASSRLS: enxerga todos os restaurantes.
+         * Só o painel /plataforma usa, via middleware UsePlatformConnection,
+         * depois de confirmar que quem pede é a super-admin.
+         * Nunca use esta conexão fora desse painel.
+         */
+        'pgsql_platform' => [
+            'driver' => 'pgsql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_PLATFORM_USERNAME'),
+            'password' => env('DB_PLATFORM_PASSWORD'),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

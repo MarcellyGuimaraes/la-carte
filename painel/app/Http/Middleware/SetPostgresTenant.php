@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -24,8 +25,24 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class SetPostgresTenant
 {
+    /** Conexões que ignoram a RLS. Nenhuma pode atender o /admin. */
+    private const PRIVILEGED_CONNECTIONS = ['pgsql_platform', 'pgsql_owner'];
+
     public function handle(Request $request, Closure $next): Response
     {
+        /*
+         * Trava contra o bypass do /plataforma vazar para cá: se a conexão
+         * padrão for uma que ignora a RLS, definir tenant não serviria de nada
+         * e o dono veria todos os restaurantes. Melhor quebrar alto.
+         */
+        $connection = DB::getDefaultConnection();
+
+        if (in_array($connection, self::PRIVILEGED_CONNECTIONS, true)) {
+            throw new LogicException(
+                "Painel do restaurante atendido pela conexão [{$connection}], que ignora a RLS.",
+            );
+        }
+
         /*
          * set_config em vez de "SET app.current_tenant = X": SET não aceita
          * parâmetro, e montar SQL concatenando valor é hábito que não queremos.
