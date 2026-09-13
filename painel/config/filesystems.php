@@ -16,6 +16,13 @@ return [
     'default' => env('FILESYSTEM_DISK', 'local'),
 
     /*
+     * Onde o job de imagem grava os WebP que o cardápio exibe.
+     * Dev: 'public' (disco local servido em /storage). Produção: um disco s3
+     * apontado para o R2, trocando só o .env. O código não muda.
+     */
+    'media_disk' => env('MEDIA_DISK', 'public'),
+
+    /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------

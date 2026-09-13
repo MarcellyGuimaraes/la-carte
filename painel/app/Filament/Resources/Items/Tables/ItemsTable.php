@@ -20,7 +20,8 @@ class ItemsTable
             /* A mesma ordem que o cliente vê na mesa. */
             ->defaultSort('sort_order')
             ->columns([
-                ImageColumn::make('image_url')
+                /* O original: aparece na hora, sem esperar o worker. */
+                ImageColumn::make('image_path')
                     ->label('Foto')
                     ->disk('public'),
                 TextColumn::make('name')

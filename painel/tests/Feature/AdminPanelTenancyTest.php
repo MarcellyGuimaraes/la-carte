@@ -108,7 +108,7 @@ class AdminPanelTenancyTest extends TestCase
                 'category_id' => $this->firstCategoryId($this->tonho),
                 'name' => 'Pudim',
                 'price_cents' => '12.50',
-                'image_url' => $this->fakePhoto(),
+                'image_path' => $this->fakePhoto(),
                 'sort_order' => 1,
             ])
             ->call('create')
@@ -117,8 +117,8 @@ class AdminPanelTenancyTest extends TestCase
         $item = $this->ownerTable('items', 'Pudim');
         $this->assertSame($this->tonho, $item->tenant_id);
         $this->assertSame(1250, $item->price_cents);
-        $this->assertStringStartsWith("itens/{$this->tonho}/", $item->image_url);
-        Storage::disk('public')->assertExists($item->image_url);
+        $this->assertStringStartsWith("itens/{$this->tonho}/", $item->image_path);
+        Storage::disk('public')->assertExists($item->image_path);
     }
 
     public function test_owner_cannot_mount_edit_component_for_another_restaurant_item(): void

@@ -56,7 +56,11 @@ class ItemForm
                             ((float) str_replace(',', '.', (string) $state)) * 100,
                         ),
                     ),
-                FileUpload::make('image_url')
+                /*
+                 * Grava o original em image_path. O WebP e a image_url saem do
+                 * job ProcessItemImage, na fila.
+                 */
+                FileUpload::make('image_path')
                     ->label('Foto')
                     ->image()
                     ->disk('public')
