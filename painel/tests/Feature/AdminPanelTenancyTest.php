@@ -7,10 +7,12 @@ use App\Filament\Resources\Items\Pages\CreateItem;
 use App\Filament\Resources\Items\Pages\EditItem;
 use App\Models\Tenant;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\WithTwoTenants;
 use Tests\TestCase;
 
@@ -18,6 +20,7 @@ use Tests\TestCase;
  * Scoping por restaurante no painel /admin: o que o dono vê e edita.
  * O isolamento no banco, sem o painel, está em RowLevelSecurityTest.
  */
+#[Group('security')]
 class AdminPanelTenancyTest extends TestCase
 {
     use WithTwoTenants;
@@ -125,7 +128,7 @@ class AdminPanelTenancyTest extends TestCase
     {
         $this->bootPanelAs($this->tonho);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $this->expectException(ModelNotFoundException::class);
 
         Livewire::test(EditItem::class, ['record' => $this->firstItemId($this->nona)]);
     }

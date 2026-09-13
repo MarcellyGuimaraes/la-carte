@@ -15,6 +15,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use LogicException;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\WithTwoTenants;
 use Tests\TestCase;
 
@@ -22,6 +23,7 @@ use Tests\TestCase;
  * Painel /plataforma: a dona vê todos os restaurantes, e o bypass da RLS não
  * vaza para o /admin.
  */
+#[Group('security')]
 class PlataformaPanelTest extends TestCase
 {
     use WithTwoTenants;

@@ -9,6 +9,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\WithTwoTenants;
 use Tests\TestCase;
 
@@ -16,6 +17,7 @@ use Tests\TestCase;
  * Isolamento entre restaurantes no nível do banco, não do painel.
  * O equivalente pelo painel está em AdminPanelTenancyTest.
  */
+#[Group('security')]
 class RowLevelSecurityTest extends TestCase
 {
     use WithTwoTenants;
