@@ -104,6 +104,58 @@ class RowLevelSecurityTest extends TestCase
         DB::table('categories')->update(['tenant_id' => $this->nona]);
     }
 
+    public function test_item_cannot_point_to_category_of_another_tenant(): void
+    {
+        /*
+         * A RLS sozinha não pega isto: a checagem de FK do Postgres a ignora.
+         * Quem barra é a FK composta (category_id, tenant_id).
+         */
+        $this->actAsTenant($this->tonho);
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('foreign key');
+
+        DB::table('items')->insert([
+            'tenant_id' => $this->tonho,
+            'category_id' => $this->firstCategoryId($this->nona),
+            'name' => 'Item do Tonho na categoria da Nona',
+            'price_cents' => 1,
+        ]);
+    }
+
+    public function test_item_cannot_be_moved_to_category_of_another_tenant(): void
+    {
+        $this->actAsTenant($this->tonho);
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('foreign key');
+
+        DB::table('items')
+            ->where('id', $this->firstItemId($this->tonho))
+            ->update(['category_id' => $this->firstCategoryId($this->nona)]);
+    }
+
+    public function test_deleting_a_tenant_still_cascades_to_its_menu(): void
+    {
+        $owner = DB::connection('pgsql_owner');
+
+        $owner->table('tenants')->where('id', $this->nona)->delete();
+
+        $this->assertSame(0, $owner->table('categories')->where('tenant_id', $this->nona)->count());
+        $this->assertSame(0, $owner->table('items')->where('tenant_id', $this->nona)->count());
+        $this->assertSame(3, $owner->table('items')->where('tenant_id', $this->tonho)->count());
+    }
+
+    public function test_category_with_items_still_cannot_be_deleted(): void
+    {
+        $this->actAsTenant($this->tonho);
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('foreign key');
+
+        DB::table('categories')->where('id', $this->firstCategoryId($this->tonho))->delete();
+    }
+
     public function test_middleware_sets_tenant_from_authenticated_user(): void
     {
         $owner = $this->createUser($this->nona);

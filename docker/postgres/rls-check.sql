@@ -59,6 +59,13 @@ VALUES (2, 'Invasão', 1, now(), now());
 UPDATE categories SET tenant_id = 2 WHERE tenant_id = 1;
 
 \echo ''
+\echo 'ESPERADO: ERRO "violates foreign key constraint" ao pôr item próprio em categoria do outro tenant'
+\echo '(a RLS não pega isto; quem barra é a FK composta items(category_id, tenant_id))'
+-- Categoria 4 = Pizzas, da Nona (o Tonho tem as categorias 1 a 3 no seed).
+INSERT INTO items (tenant_id, category_id, name, price_cents, created_at, updated_at)
+VALUES (1, 4, 'Intruso', 1, now(), now());
+
+\echo ''
 \echo 'ESPERADO: ERRO ao tentar desligar a RLS (papel sem BYPASSRLS)'
 SET row_security = off;
 SELECT count(*) FROM items;
