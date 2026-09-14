@@ -5,6 +5,7 @@ import { slugFromPath } from './lib/slug'
 import { CategoryNav } from './components/CategoryNav'
 import { CategorySection } from './components/CategorySection'
 import { PwaStatus } from './components/PwaStatus'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 /**
  * ÚNICA ponte entre dados e apresentação.
@@ -20,7 +21,11 @@ export default function App() {
     return <p className="feedback">Escaneie o QR code da mesa para abrir o cardápio.</p>
   }
 
-  return <MenuScreen slug={slug} />
+  return (
+    <ErrorBoundary>
+      <MenuScreen slug={slug} />
+    </ErrorBoundary>
+  )
 }
 
 function MenuScreen({ slug }: { slug: string }) {

@@ -1,4 +1,5 @@
 import type { Menu } from '../types/menu'
+import { isMenu } from '../lib/menu-guard'
 
 /**
  * Fronteira de dados: ÚNICO arquivo que sabe de onde o cardápio vem.
@@ -84,10 +85,42 @@ export async function readVersion(slug: string, version: number): Promise<Result
     return { ok: false, error: 'Não foi possível carregar o cardápio.' }
   }
 
-  try {
-    return { ok: true, value: (await response.value.json()) as Menu }
-  } catch {
+  const body: unknown = await response.value.json().catch(() => null)
+
+  /* JSON válido não basta: fora do contrato derrubaria a tela (tela branca). */
+  if (!isMenu(body)) {
     return { ok: false, error: 'Cardápio publicado com formato inválido.' }
+  }
+
+  return { ok: true, value: body }
+}
+
+/** Mesmo nome do cacheName da rota de v{n}.json em vite.config.ts. */
+const VERSIONS_CACHE = 'menu-versions'
+
+/**
+ * Versões deste restaurante que o service worker guardou no aparelho, da mais
+ * nova para a mais antiga.
+ *
+ * Plano B do offline: se a versão lembrada saiu do cache (limite de entradas,
+ * limpeza do navegador) ou o localStorage foi apagado, ainda dá para abrir
+ * qualquer outra que esteja guardada, em vez de "sem cardápio salvo".
+ */
+export async function cachedVersions(slug: string): Promise<number[]> {
+  try {
+    if (typeof caches === 'undefined') return []
+
+    const requests = await (await caches.open(VERSIONS_CACHE)).keys()
+    const pattern = new RegExp(`/menus/${slug}/v(\\d+)\\.json$`)
+
+    return requests
+      .map((request) => pattern.exec(new URL(request.url).pathname)?.[1])
+      .filter((match): match is string => match !== undefined)
+      .map(Number)
+      .sort((a, b) => b - a)
+  } catch {
+    /* Cache Storage indisponível (contexto inseguro, dados bloqueados). */
+    return []
   }
 }
 

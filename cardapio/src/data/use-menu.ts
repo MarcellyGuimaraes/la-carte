@@ -1,16 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Menu } from '../types/menu'
-import { knownVersion, readPointer, readVersion, rememberVersion } from './menu-source'
+import { createMenuLoader } from './menu-loader'
+import { cachedVersions, knownVersion, readPointer, readVersion, rememberVersion } from './menu-source'
 
 /**
- * Orquestra de onde vem o cardápio que está na tela.
+ * Liga o menu-loader (as regras de rede e offline) ao React e aos eventos do
+ * navegador. As decisões vivem em menu-loader.ts, testadas sem navegador.
  *
- * 1. Abre na hora a última versão que este aparelho já abriu (do cache do
- *    service worker, sem esperar rede). Em internet ruim ou offline, é isto.
- * 2. Em paralelo, pergunta ao ponteiro qual versão está no ar. Se for outra,
- *    baixa e troca. Sem rede, fica com a que já está na tela.
- * 3. Pergunta de novo quando a conexão volta e quando o app volta a ficar
- *    visível (celular que ficou no bolso com a aba aberta).
+ * Checa o ponteiro de novo quando a conexão volta e quando o app volta a
+ * ficar visível (celular que ficou no bolso com a aba aberta).
  */
 
 export type MenuState =
@@ -18,47 +16,16 @@ export type MenuState =
   | { status: 'ready'; menu: Menu; version: number }
   | { status: 'error'; error: string }
 
+const source = { readPointer, readVersion, knownVersion, rememberVersion, cachedVersions }
+
 export function useMenu(slug: string): MenuState {
   const [state, setState] = useState<MenuState>({ status: 'loading' })
-  /* Ref, não state: os listeners precisam da versão atual, não a da montagem. */
-  const shownVersion = useRef<number | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-
-    const show = (menu: Menu, version: number) => {
-      if (cancelled) return
-      shownVersion.current = version
-      rememberVersion(slug, version)
-      setState({ status: 'ready', menu, version })
-    }
-
-    const fail = (error: string) => {
-      /* Erro só substitui a tela se não há cardápio nenhum nela. */
-      if (!cancelled && shownVersion.current === null) setState({ status: 'error', error })
-    }
-
-    const syncWithPointer = async () => {
-      const pointer = await readPointer(slug)
-      if (!pointer.ok) return fail(pointer.error)
-      if (pointer.value === shownVersion.current) return
-
-      const menu = await readVersion(slug, pointer.value)
-      if (!menu.ok) return fail(menu.error)
-
-      show(menu.value, pointer.value)
-    }
-
-    const start = async () => {
-      const known = knownVersion(slug)
-
-      if (known !== null) {
-        const cached = await readVersion(slug, known)
-        if (cached.ok) show(cached.value, known)
-      }
-
-      await syncWithPointer()
-    }
+    const loader = createMenuLoader(slug, source, {
+      onMenu: (menu, version) => setState({ status: 'ready', menu, version }),
+      onError: (error) => setState({ status: 'error', error }),
+    })
 
     /*
      * Na primeira visita o service worker assume a página DEPOIS de o cardápio
@@ -66,21 +33,23 @@ export function useMenu(slug: string): MenuState {
      * cacheado. Pedir de novo quando ele assume guarda a versão para o offline.
      */
     const warmCache = () => {
-      if (shownVersion.current !== null) void readVersion(slug, shownVersion.current)
+      const version = loader.shownVersion()
+      if (version !== null) void readVersion(slug, version)
     }
 
+    const sync = () => void loader.sync()
     const syncWhenVisible = () => {
-      if (document.visibilityState === 'visible') void syncWithPointer()
+      if (document.visibilityState === 'visible') sync()
     }
 
-    void start()
-    window.addEventListener('online', syncWithPointer)
+    void loader.start()
+    window.addEventListener('online', sync)
     document.addEventListener('visibilitychange', syncWhenVisible)
     navigator.serviceWorker?.addEventListener('controllerchange', warmCache)
 
     return () => {
-      cancelled = true
-      window.removeEventListener('online', syncWithPointer)
+      loader.stop()
+      window.removeEventListener('online', sync)
       document.removeEventListener('visibilitychange', syncWhenVisible)
       navigator.serviceWorker?.removeEventListener('controllerchange', warmCache)
     }
