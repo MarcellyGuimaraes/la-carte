@@ -62,6 +62,17 @@ trait WithTwoTenants
             ->value('id');
     }
 
+    /**
+     * Muda o rascunho, para a próxima publicação ter conteúdo novo (publicar
+     * sem mudança não gera versão: PublishMenu é idempotente).
+     */
+    private function renameFirstItem(int $tenantId, string $name): void
+    {
+        DB::connection('pgsql_owner')->table('items')
+            ->where('id', $this->firstItemId($tenantId))
+            ->update(['name' => $name]);
+    }
+
     private function firstCategoryId(int $tenantId): int
     {
         return DB::connection('pgsql_owner')->table('categories')

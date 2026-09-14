@@ -12,6 +12,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Throwable;
 
 /**
  * Botão "Publicar": transforma o rascunho (banco) no cardápio que a mesa lê.
@@ -56,10 +57,23 @@ class PublishMenu implements ShouldQueue
 
     public function handle(): void
     {
-        $this->asTenant($this->tenantId, fn () => DB::transaction(fn () => $this->publish()));
+        $slug = $this->asTenant($this->tenantId, fn () => DB::transaction(fn () => $this->publish()));
+
+        /*
+         * Faxina FORA da transação e sem derrubar o job: nesse ponto o cardápio
+         * novo já está no ar. Se ela lançasse, a transação desfaria o
+         * current_version de um cardápio publicado e o retry publicaria versões
+         * extras. Sobrou arquivo? A próxima publicação limpa.
+         */
+        try {
+            $this->pruneOldVersions(Storage::disk(config('filesystems.snapshot_disk')), $slug);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
-    private function publish(): void
+    /** @return string o slug publicado, para a faxina. */
+    private function publish(): string
     {
         /*
          * lockForUpdate na linha do restaurante: dois "Publicar" seguidos
@@ -74,6 +88,24 @@ class PublishMenu implements ShouldQueue
         }
 
         $disk = Storage::disk(config('filesystems.snapshot_disk'));
+        $snapshot = $this->snapshot($tenant);
+        $published = $this->publishedVersion($disk, $tenant->slug);
+
+        /*
+         * Idempotência: nada mudou desde a versão no ar, então não há o que
+         * publicar. Um retry depois de sucesso vira no-op, e "Publicar" três
+         * vezes seguidas não empurra as versões de rollback para fora.
+         */
+        if ($published !== null && $this->sameContent($published['menu'], $snapshot)) {
+            /* Conserta banco que ficou para trás (ponteiro gravado, commit perdido). */
+            if ($tenant->current_version < $published['version']) {
+                $tenant->current_version = $published['version'];
+                $tenant->save();
+            }
+
+            return $tenant->slug;
+        }
+
         $stored = $this->storedVersions($disk, $tenant->slug);
 
         /*
@@ -86,10 +118,57 @@ class PublishMenu implements ShouldQueue
         $tenant->current_version = $version;
         $tenant->save();
 
-        /* Ordem importa: conteúdo antes do ponteiro; faxina só depois do ponteiro. */
-        $this->write($disk, self::versionPath($tenant->slug, $version), $this->snapshot($tenant), self::VERSION_CACHE_CONTROL);
+        /*
+         * Ordem importa: conteúdo gravado E conferido antes do ponteiro. Se
+         * qualquer passo lançar, o ponteiro continua na versão anterior, que
+         * está inteira, e a transação desfaz o current_version.
+         */
+        $this->write($disk, self::versionPath($tenant->slug, $version), $snapshot, self::VERSION_CACHE_CONTROL);
         $this->write($disk, self::pointerPath($tenant->slug), ['version' => $version], self::POINTER_CACHE_CONTROL);
-        $this->pruneOldVersions($disk, $tenant->slug);
+
+        return $tenant->slug;
+    }
+
+    /**
+     * A versão para a qual o current.json aponta, se existir e for legível.
+     *
+     * @return array{version: int, menu: array<string, mixed>}|null
+     */
+    private function publishedVersion(Filesystem $disk, string $slug): ?array
+    {
+        $pointer = $this->readJson($disk, self::pointerPath($slug));
+        $version = is_array($pointer) ? ($pointer['version'] ?? null) : null;
+
+        if (! is_int($version)) {
+            return null;
+        }
+
+        $menu = $this->readJson($disk, self::versionPath($slug, $version));
+
+        return is_array($menu) ? ['version' => $version, 'menu' => $menu] : null;
+    }
+
+    /**
+     * null se o arquivo não existe ou não é JSON. exists() antes do get(): com
+     * o disco configurado para lançar erro, ler arquivo ausente estouraria na
+     * primeira publicação de um restaurante.
+     */
+    private function readJson(Filesystem $disk, string $path): mixed
+    {
+        return $disk->exists($path) ? json_decode((string) $disk->get($path), true) : null;
+    }
+
+    /**
+     * Mesmo cardápio, ignorando generated_at (muda a cada geração).
+     *
+     * @param  array<string, mixed>  $published
+     * @param  array<string, mixed>  $draft
+     */
+    private function sameContent(array $published, array $draft): bool
+    {
+        unset($published['generated_at'], $draft['generated_at']);
+
+        return json_encode($published) === json_encode($draft);
     }
 
     /**
@@ -145,12 +224,29 @@ class PublishMenu implements ShouldQueue
         if (! $stored) {
             throw new RuntimeException("Falha ao gravar [{$path}] no storage de snapshots.");
         }
+
+        /*
+         * Relê o que gravou. "put deu certo" não prova que o arquivo está
+         * inteiro, e um v{n} corrompido com cache imutável de 1 ano não tem
+         * conserto no celular. Um GET por publicação é barato.
+         */
+        if ($disk->get($path) !== $json) {
+            throw new RuntimeException("Conteúdo gravado em [{$path}] não confere com o gerado.");
+        }
     }
 
-    /** Apaga tudo além das KEEP_VERSIONS versões mais novas. */
+    /**
+     * Apaga tudo além das KEEP_VERSIONS versões mais novas, e nunca a versão
+     * para a qual o current.json aponta.
+     */
     private function pruneOldVersions(Filesystem $disk, string $slug): void
     {
-        $expired = array_slice($this->storedVersions($disk, $slug), self::KEEP_VERSIONS);
+        $pointed = $this->publishedVersion($disk, $slug)['version'] ?? null;
+
+        $expired = array_values(array_filter(
+            array_slice($this->storedVersions($disk, $slug), self::KEEP_VERSIONS),
+            fn (int $version): bool => $version !== $pointed,
+        ));
 
         if ($expired === []) {
             return;

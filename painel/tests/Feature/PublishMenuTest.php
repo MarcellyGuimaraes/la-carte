@@ -98,7 +98,8 @@ class PublishMenuTest extends TestCase
 
     public function test_after_four_publishes_only_the_last_three_versions_remain(): void
     {
-        foreach (range(1, 4) as $_) {
+        foreach (range(1, 4) as $round) {
+            $this->renameFirstItem($this->tonho, "rodada {$round}");
             $this->publish($this->tonho);
         }
 
@@ -113,7 +114,8 @@ class PublishMenuTest extends TestCase
     {
         $this->publish($this->nona);
 
-        foreach (range(1, 4) as $_) {
+        foreach (range(1, 4) as $round) {
+            $this->renameFirstItem($this->tonho, "rodada {$round}");
             $this->publish($this->tonho);
         }
 

@@ -74,7 +74,8 @@ class SnapshotCacheHeadersTest extends TestCase
 
     public function test_after_four_publishes_the_bucket_keeps_three_versions(): void
     {
-        foreach (range(1, 4) as $_) {
+        foreach (range(1, 4) as $round) {
+            $this->renameFirstItem($this->tonho, "rodada {$round}");
             (new PublishMenu($this->tonho))->handle();
         }
 
