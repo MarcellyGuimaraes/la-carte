@@ -154,6 +154,25 @@ body {
   opacity: 0.5;
 }
 
+.item__image {
+  flex-shrink: 0;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 0.5rem;
+  object-fit: cover;
+  /* Centraliza a foto na linha sem quebrar o baseline de nome/preço. */
+  align-self: center;
+}
+
+/* Item sem foto cadastrada: mesma caixa, com ícone neutro. */
+.item__image--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+}
+
 .item__text {
   min-width: 0;
 }
