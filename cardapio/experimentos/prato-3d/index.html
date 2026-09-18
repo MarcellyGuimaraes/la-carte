@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prato em 3D / AR — piloto La Carte</title>
+
+  <!--
+    PILOTO ISOLADO — não faz parte do cardápio de produção.
+
+    Objetivo: sentir na mão como seria o "prato em tamanho real". Este arquivo é
+    HTML puro, sem build e sem service worker, de propósito: não encosta no
+    pipeline offline (current.json / v{n}.json) do cardápio.
+
+    Como funciona por baixo:
+      - <model-viewer> é a lib do Google. Ela mostra o modelo 3D girável na
+        tela E dispara o AR nativo do celular:
+          · iPhone  -> AR Quick Look, a partir do arquivo .usdz (ios-src)
+          · Android -> Scene Viewer, a partir do arquivo .glb (src)
+      - ar-scale="fixed" trava o TAMANHO REAL: o prato aparece na mesa do
+        tamanho que o modelo foi feito, o cliente não consegue "esticar".
+
+    Modelo de exemplo: um espetinho (shishkebab) dos assets públicos do próprio
+    model-viewer — serve como "prato teste" porque já vem com .glb e .usdz e na
+    escala certa. Num produto real, cada prato do plano premium teria seu par
+    .glb/.usdz gerado por scan/fotogrametria.
+
+    O QUE ESTE PILOTO **NÃO** RESOLVE (as dores reais, ver conversa):
+      - produção de um modelo 3D por prato (custo contínuo);
+      - peso: um .glb tem MBs, contra ~50 KB de uma foto WebP — por isso isto
+        fica FORA do snapshot offline e só carrega sob toque, com internet.
+  -->
+
+  <!-- model-viewer via CDN (módulo ES). Só funciona com internet. -->
+  <script type="module"
+    src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #14110f;
+      --surface: #1f1b18;
+      --surface-raised: #2a2420;
+      --text: #f5efe8;
+      --text-muted: #b3a79b;
+      --accent: #e8a13a;
+      --border: #332c26;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 1.25rem;
+    }
+    .wrap { width: 100%; max-width: 440px; }
+    .brand {
+      font-size: 0.8125rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin: 0 0 1rem;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      overflow: hidden;
+    }
+    model-viewer {
+      width: 100%;
+      height: 320px;
+      background: radial-gradient(120% 120% at 50% 20%, #241f1b 0%, #161311 100%);
+      --poster-color: transparent;
+    }
+    .plan-tag {
+      position: absolute;
+      top: 0.75rem;
+      left: 0.75rem;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #1a1206;
+      background: var(--accent);
+      border-radius: 999px;
+    }
+    .stage { position: relative; }
+    .body { padding: 1rem 1.15rem 1.25rem; }
+    .row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .name { margin: 0; font-size: 1.25rem; font-weight: 600; }
+    .price { font-size: 1.15rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
+    .desc { margin: 0.4rem 0 0; color: var(--text-muted); font-size: 0.95rem; }
+    .ar-btn {
+      margin-top: 1rem;
+      width: 100%;
+      padding: 0.85rem 1rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #1a1206;
+      background: var(--accent);
+      border: none;
+      border-radius: 0.75rem;
+      cursor: pointer;
+    }
+    .ar-btn[disabled] { opacity: 0.55; cursor: default; }
+    .hint {
+      margin: 0.7rem 0 0;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    .note {
+      margin: 1.25rem 0 0;
+      padding: 0.9rem 1rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      background: var(--surface-raised);
+      border-radius: 0.75rem;
+    }
+    .note b { color: var(--text); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p class="brand">Bar do Tonho · piloto 3D</p>
+
+    <div class="card">
+      <div class="stage">
+        <span class="plan-tag">★ Plano Premium</span>
+        <model-viewer
+          id="viewer"
+          src="https://modelviewer.dev/shared-assets/models/shishkebab.glb"
+          ios-src="https://modelviewer.dev/shared-assets/models/shishkebab.usdz"
+          alt="Espetinho em 3D, modelo de demonstração"
+          camera-controls
+          auto-rotate
+          auto-rotate-delay="0"
+          shadow-intensity="1"
+          ar
+          ar-modes="webxr scene-viewer quick-look"
+          ar-scale="fixed"
+          poster-color="transparent">
+        </model-viewer>
+      </div>
+
+      <div class="body">
+        <div class="row">
+          <h1 class="name">Espetinho da casa</h1>
+          <span class="price">R$ 18,00</span>
+        </div>
+        <p class="desc">Prato-teste do piloto. Arraste para girar; toque no botão para ver na sua mesa, em tamanho real.</p>
+
+        <button id="ar-btn" class="ar-btn">Ver na minha mesa (tamanho real)</button>
+        <p class="hint" id="hint">Abra no celular para o modo tamanho real.</p>
+      </div>
+    </div>
+
+    <p class="note">
+      <b>Como isto se encaixa:</b> recurso de <b>plano mais alto</b>, não do cardápio comum.
+      O modelo 3D pesa MBs, então fica <b>fora do cache offline</b> e só carrega quando
+      o cliente toca — com internet. Cada prato premium precisaria do seu próprio
+      par <code>.glb</code>/<code>.usdz</code> (scan ou fotogrametria).
+    </p>
+  </div>
+
+  <script>
+    // O botão delega para o AR do <model-viewer>. Se o aparelho não suporta AR
+    // (desktop, celular antigo), continua dando para girar o 3D na tela — só o
+    // "tamanho real" fica indisponível, sem quebrar a página.
+    const viewer = document.getElementById('viewer')
+    const btn = document.getElementById('ar-btn')
+    const hint = document.getElementById('hint')
+
+    viewer.addEventListener('load', () => {
+      if (viewer.canActivateAR) {
+        hint.textContent = 'Aponte a câmera para a mesa e posicione o prato.'
+      } else {
+        btn.disabled = true
+        btn.textContent = 'Tamanho real indisponível neste aparelho'
+        hint.textContent = 'No desktop dá para girar o 3D; o AR abre em celulares compatíveis.'
+      }
+    })
+
+    btn.addEventListener('click', () => {
+      if (viewer.canActivateAR) viewer.activateAR()
+    })
+  </script>
+</body>
+</html>
