@@ -8,30 +8,22 @@
   <!--
     PILOTO ISOLADO — não faz parte do cardápio de produção.
 
-    Objetivo: sentir na mão como seria o "prato em tamanho real". Este arquivo é
-    HTML puro, sem build e sem service worker, de propósito: não encosta no
-    pipeline offline (current.json / v{n}.json) do cardápio.
-
     Como funciona por baixo:
-      - <model-viewer> é a lib do Google. Ela mostra o modelo 3D girável na
-        tela E dispara o AR nativo do celular:
-          · iPhone  -> AR Quick Look, a partir do arquivo .usdz (ios-src)
-          · Android -> Scene Viewer, a partir do arquivo .glb (src)
-      - ar-scale="fixed" trava o TAMANHO REAL: o prato aparece na mesa do
-        tamanho que o modelo foi feito, o cliente não consegue "esticar".
+      - <model-viewer> (lib do Google) mostra o modelo 3D girável E dispara o AR
+        nativo do celular:
+          · iPhone  -> AR Quick Look (arquivo .usdz em ios-src)
+          · Android -> Scene Viewer (arquivo .glb em src) — exige ARCore
+      - ar-scale="fixed" trava o TAMANHO REAL na mesa.
 
-    Modelo de exemplo: um espetinho (shishkebab) dos assets públicos do próprio
-    model-viewer — serve como "prato teste" porque já vem com .glb e .usdz e na
-    escala certa. Num produto real, cada prato do plano premium teria seu par
-    .glb/.usdz gerado por scan/fotogrametria.
+    O botão de AR é um filho com slot="ar-button": é o próprio model-viewer que
+    decide MOSTRAR (só quando o aparelho suporta AR) e DISPARAR o AR ao toque.
+    Isso evita depender de checagens frágeis de "canActivateAR" no carregamento.
 
-    O QUE ESTE PILOTO **NÃO** RESOLVE (as dores reais, ver conversa):
-      - produção de um modelo 3D por prato (custo contínuo);
-      - peso: um .glb tem MBs, contra ~50 KB de uma foto WebP — por isso isto
-        fica FORA do snapshot offline e só carrega sob toque, com internet.
+    Modelo de exemplo: espetinho dos assets públicos do model-viewer (.glb/.usdz,
+    na escala certa). Num produto real, cada prato premium teria seu par gerado
+    por scan/fotogrametria — o custo real da ideia, não a parte técnica.
   -->
 
-  <!-- model-viewer via CDN (módulo ES). Só funciona com internet. -->
   <script type="module"
     src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
 
@@ -71,11 +63,11 @@
       border-radius: 1rem;
       overflow: hidden;
     }
+    .stage { position: relative; }
     model-viewer {
       width: 100%;
       height: 320px;
       background: radial-gradient(120% 120% at 50% 20%, #241f1b 0%, #161311 100%);
-      --poster-color: transparent;
     }
     .plan-tag {
       position: absolute;
@@ -94,7 +86,43 @@
       background: var(--accent);
       border-radius: 999px;
     }
-    .stage { position: relative; }
+    /* Barra de progresso enquanto o .glb baixa (pode ter alguns MB no 4G). */
+    .progress {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: transparent;
+    }
+    .progress .bar {
+      height: 100%;
+      width: 0;
+      background: var(--accent);
+      transition: width 0.2s;
+    }
+    .progress[hidden] { display: none; }
+
+    /* Botão de AR nativo do model-viewer (slot="ar-button"). */
+    .ar-btn {
+      position: absolute;
+      bottom: 0.9rem;
+      right: 0.9rem;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 0.9rem;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #1a1206;
+      background: var(--accent);
+      border: none;
+      border-radius: 999px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+      cursor: pointer;
+    }
+
     .body { padding: 1rem 1.15rem 1.25rem; }
     .row {
       display: flex;
@@ -105,22 +133,9 @@
     .name { margin: 0; font-size: 1.25rem; font-weight: 600; }
     .price { font-size: 1.15rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
     .desc { margin: 0.4rem 0 0; color: var(--text-muted); font-size: 0.95rem; }
-    .ar-btn {
-      margin-top: 1rem;
-      width: 100%;
-      padding: 0.85rem 1rem;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #1a1206;
-      background: var(--accent);
-      border: none;
-      border-radius: 0.75rem;
-      cursor: pointer;
-    }
-    .ar-btn[disabled] { opacity: 0.55; cursor: default; }
     .hint {
-      margin: 0.7rem 0 0;
-      font-size: 0.8rem;
+      margin: 0.9rem 0 0;
+      font-size: 0.82rem;
       color: var(--text-muted);
       text-align: center;
     }
@@ -133,6 +148,7 @@
       border-radius: 0.75rem;
     }
     .note b { color: var(--text); font-weight: 600; }
+    code { font-size: 0.9em; }
   </style>
 </head>
 <body>
@@ -151,10 +167,20 @@
           auto-rotate
           auto-rotate-delay="0"
           shadow-intensity="1"
+          loading="eager"
           ar
           ar-modes="webxr scene-viewer quick-look"
-          ar-scale="fixed"
-          poster-color="transparent">
+          ar-scale="fixed">
+
+          <!-- model-viewer mostra este botão SÓ quando o AR é possível. -->
+          <button slot="ar-button" class="ar-btn">
+            📷 Ver na minha mesa
+          </button>
+
+          <!-- Barra de progresso do download do modelo. -->
+          <div class="progress" slot="progress-bar">
+            <div class="bar" id="bar"></div>
+          </div>
         </model-viewer>
       </div>
 
@@ -163,10 +189,8 @@
           <h1 class="name">Espetinho da casa</h1>
           <span class="price">R$ 18,00</span>
         </div>
-        <p class="desc">Prato-teste do piloto. Arraste para girar; toque no botão para ver na sua mesa, em tamanho real.</p>
-
-        <button id="ar-btn" class="ar-btn">Ver na minha mesa (tamanho real)</button>
-        <p class="hint" id="hint">Abra no celular para o modo tamanho real.</p>
+        <p class="desc">Prato-teste do piloto. Arraste para girar. No celular compatível, toque em “Ver na minha mesa”.</p>
+        <p class="hint" id="hint">Carregando modelo 3D…</p>
       </div>
     </div>
 
@@ -179,25 +203,32 @@
   </div>
 
   <script>
-    // O botão delega para o AR do <model-viewer>. Se o aparelho não suporta AR
-    // (desktop, celular antigo), continua dando para girar o 3D na tela — só o
-    // "tamanho real" fica indisponível, sem quebrar a página.
     const viewer = document.getElementById('viewer')
-    const btn = document.getElementById('ar-btn')
+    const bar = document.getElementById('bar')
     const hint = document.getElementById('hint')
 
-    viewer.addEventListener('load', () => {
-      if (viewer.canActivateAR) {
-        hint.textContent = 'Aponte a câmera para a mesa e posicione o prato.'
-      } else {
-        btn.disabled = true
-        btn.textContent = 'Tamanho real indisponível neste aparelho'
-        hint.textContent = 'No desktop dá para girar o 3D; o AR abre em celulares compatíveis.'
-      }
+    // Progresso do download do .glb.
+    const progress = document.querySelector('.progress')
+    viewer.addEventListener('progress', (e) => {
+      const pct = Math.round(e.detail.totalProgress * 100)
+      bar.style.width = pct + '%'
+      progress.hidden = e.detail.totalProgress === 1
     })
 
-    btn.addEventListener('click', () => {
-      if (viewer.canActivateAR) viewer.activateAR()
+    viewer.addEventListener('load', () => {
+      progress.hidden = true
+      // canActivateAR: só para AJUSTAR o texto de ajuda. Não controla o botão —
+      // quem mostra/dispara o botão é o próprio model-viewer (slot=ar-button).
+      hint.textContent = viewer.canActivateAR
+        ? 'Toque em “Ver na minha mesa” e aponte a câmera para a mesa.'
+        : 'Neste aparelho dá para girar o 3D. O “tamanho real” abre em celulares com AR (iPhone recente / Android com ARCore).'
+    })
+
+    // Se o AR falhar ao abrir, avisa em vez de ficar mudo.
+    viewer.addEventListener('ar-status', (e) => {
+      if (e.detail.status === 'failed') {
+        hint.textContent = 'Não foi possível abrir o AR neste aparelho/navegador. Tente o Safari (iPhone) ou o Chrome (Android).'
+      }
     })
   </script>
 </body>
