@@ -149,6 +149,11 @@
     }
     .note b { color: var(--text); font-weight: 600; }
     code { font-size: 0.9em; }
+    /* Gatilho de AR nativo do iOS (Quick Look): um link rel="ar" para o .usdz.
+       Mostrado só no iPhone, funciona no Safari sem depender do model-viewer. */
+    .ios-ar { display: block; margin: 0.9rem 0 0; }
+    .ios-ar img { display: block; width: 100%; height: auto; }
+    .ios-ar[hidden] { display: none; }
   </style>
 </head>
 <body>
@@ -191,6 +196,15 @@
         </div>
         <p class="desc">Prato-teste do piloto. Arraste para girar. No celular compatível, toque em “Ver na minha mesa”.</p>
         <p class="hint" id="hint">Carregando modelo 3D…</p>
+
+        <!--
+          iOS Quick Look: link nativo rel="ar" -> .usdz. Precisa de UM <img>
+          filho (spec da Apple). Em Safari, tocar abre o AR em tamanho real,
+          mesmo que o botão do model-viewer não apareça. Revelado via JS no iOS.
+        -->
+        <a id="iosAr" class="ios-ar" rel="ar" href="https://modelviewer.dev/shared-assets/models/shishkebab.usdz" hidden>
+          <img alt="Ver em tamanho real (AR)" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='420'%20height='56'%3E%3Crect%20width='420'%20height='56'%20rx='12'%20fill='%23e8a13a'/%3E%3Ctext%20x='210'%20y='36'%20font-family='sans-serif'%20font-size='18'%20font-weight='700'%20fill='%231a1206'%20text-anchor='middle'%3EVer%20em%20tamanho%20real%20(AR)%3C/text%3E%3C/svg%3E">
+        </a>
       </div>
     </div>
 
@@ -220,6 +234,11 @@
     // botão — é a causa mais comum de "o AR não abre a câmera".
     const ua = navigator.userAgent || ''
     const isIOS = /iPhone|iPad|iPod/.test(ua)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) // iPadOS finge ser Mac
+
+    // No iPhone, mostra já o gatilho nativo de AR (não espera o 3D carregar).
+    const iosAr = document.getElementById('iosAr')
+    if (isIOS) iosAr.hidden = false
 
     viewer.addEventListener('load', () => {
       progress.hidden = true
@@ -228,7 +247,7 @@
       if (viewer.canActivateAR) {
         hint.textContent = 'Toque em “Ver na minha mesa” e aponte a câmera para a mesa.'
       } else if (isIOS) {
-        hint.innerHTML = 'No iPhone o “tamanho real” abre <b>só no Safari</b>. Se você abriu por um app (Instagram/WhatsApp), toque em <b>⋯</b> ou no ícone de compartilhar e escolha <b>Abrir no Safari</b>.'
+        hint.innerHTML = 'Toque no botão <b>“Ver em tamanho real”</b>. Se não abrir a câmera, você está num app (Instagram/WhatsApp): toque em <b>⋯</b> / compartilhar → <b>Abrir no Safari</b> e tente de novo.'
       } else {
         hint.textContent = 'Neste aparelho dá para girar o 3D. O “tamanho real” abre em celulares com AR (iPhone recente / Android com ARCore).'
       }
