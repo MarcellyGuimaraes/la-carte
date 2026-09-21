@@ -215,13 +215,23 @@
       progress.hidden = e.detail.totalProgress === 1
     })
 
+    // No iPhone, o AR (Quick Look) só abre no Safari. Dentro do navegador de um
+    // app (Instagram, Facebook), o iOS bloqueia e o model-viewer nem mostra o
+    // botão — é a causa mais comum de "o AR não abre a câmera".
+    const ua = navigator.userAgent || ''
+    const isIOS = /iPhone|iPad|iPod/.test(ua)
+
     viewer.addEventListener('load', () => {
       progress.hidden = true
       // canActivateAR: só para AJUSTAR o texto de ajuda. Não controla o botão —
       // quem mostra/dispara o botão é o próprio model-viewer (slot=ar-button).
-      hint.textContent = viewer.canActivateAR
-        ? 'Toque em “Ver na minha mesa” e aponte a câmera para a mesa.'
-        : 'Neste aparelho dá para girar o 3D. O “tamanho real” abre em celulares com AR (iPhone recente / Android com ARCore).'
+      if (viewer.canActivateAR) {
+        hint.textContent = 'Toque em “Ver na minha mesa” e aponte a câmera para a mesa.'
+      } else if (isIOS) {
+        hint.innerHTML = 'No iPhone o “tamanho real” abre <b>só no Safari</b>. Se você abriu por um app (Instagram/WhatsApp), toque em <b>⋯</b> ou no ícone de compartilhar e escolha <b>Abrir no Safari</b>.'
+      } else {
+        hint.textContent = 'Neste aparelho dá para girar o 3D. O “tamanho real” abre em celulares com AR (iPhone recente / Android com ARCore).'
+      }
     })
 
     // Se o AR falhar ao abrir, avisa em vez de ficar mudo.
