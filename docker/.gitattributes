@@ -1,0 +1,4 @@
+# Scripts que rodam dentro de containers Linux: sempre LF, mesmo com
+# core.autocrlf=true no Windows. Com CRLF o sh quebra ("set: -\r: invalid option").
+*.sh  text eol=lf
+*.sql text eol=lf

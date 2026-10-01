@@ -1,7 +1,47 @@
-# Infra de desenvolvimento local do La Carte.
-# Subir:   docker compose up -d
-# Parar:   docker compose down        (mantém os dados)
-# Zerar:   docker compose down -v     (apaga o volume, banco volta vazio)
+# Ambiente de desenvolvimento local do La Carte. Só dev: nada aqui vai para produção.
+#
+# Sistema completo:  docker compose up -d
+#   Postgres + MinIO + painel (http://localhost:8000/admin e /plataforma)
+#   + worker da fila + PWA (http://localhost:5173/bar-do-tonho).
+#   A primeira subida demora (build da imagem, composer install, npm ci).
+#   Acompanhar:      docker compose logs -f painel-setup painel painel-worker cardapio
+# Só infra:          docker compose up -d postgres minio minio-init
+#   (para rodar a suíte do painel e a PWA no host, como antes)
+# Parar:             docker compose down        (mantém os dados)
+# Zerar:             docker compose down -v     (apaga banco, bucket, vendor e
+#                                                node_modules; tudo volta do zero)
+#
+# Portas no host (só 127.0.0.1): 8000 painel · 5173 PWA · 5433 Postgres
+# · 9000 MinIO (API) · 9001 MinIO (console). Pare `php artisan serve` e
+# `npm run dev` do host antes de subir o sistema completo, senão a porta conflita.
+#
+# O painel no container NUNCA lê o painel/.env da máquina (que pode apontar para
+# produção): docker/painel/.env.docker é montado por cima dele. Se painel/.env
+# não existir, o Docker cria um arquivo vazio no lugar (está no .gitignore); o
+# `php artisan` do host continua precisando do próprio .env.
+
+# Configuração comum aos três serviços do painel (setup, web e worker).
+x-painel: &painel
+  build: ./docker/painel
+  image: la-carte-painel-dev
+  volumes:
+    - ./painel:/var/www/html
+    # Por cima do .env da máquina: o container só enxerga valores de dev.
+    - ./docker/painel/.env.docker:/var/www/html/.env:ro
+    # vendor/ fora do disco do Windows: mais rápido e não mistura com o do host.
+    - painel_vendor:/var/www/html/vendor
+    # O symlink public/storage do host aponta para um caminho do Windows, que não
+    # existe no Linux. Montar a pasta real por cima dele faz /storage funcionar
+    # sem rodar storage:link (que reescreveria o symlink no disco do host).
+    - ./painel/storage/app/public:/var/www/html/public/storage
+  environment:
+    # Caches do Laravel fora de bootstrap/cache/, que é compartilhado com o host:
+    # um config:cache feito no host (com o .env de produção) seria lido aqui.
+    APP_CONFIG_CACHE: /tmp/laravel/config.php
+    APP_ROUTES_CACHE: /tmp/laravel/routes.php
+    APP_EVENTS_CACHE: /tmp/laravel/events.php
+    APP_PACKAGES_CACHE: /tmp/laravel/packages.php
+    APP_SERVICES_CACHE: /tmp/laravel/services.php
 
 services:
   postgres:
@@ -72,6 +112,80 @@ services:
       "
     restart: "no"
 
+  # Roda a cada subida e sai: composer install, migrations e seed (só em banco
+  # vazio). Se falhar, web e worker não sobem e o erro fica no log deste serviço.
+  painel-setup:
+    <<: *painel
+    container_name: la-carte-painel-setup
+    command: ["sh", "/setup.sh"]
+    volumes:
+      - ./painel:/var/www/html
+      - ./docker/painel/.env.docker:/var/www/html/.env:ro
+      - painel_vendor:/var/www/html/vendor
+      - ./docker/painel/setup.sh:/setup.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # Painel web. O servidor embutido relê o PHP a cada request: editar e recarregar.
+  painel:
+    <<: *painel
+    container_name: la-carte-painel
+    command: ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      painel-setup:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Worker da fila (publicação e imagens). queue:listen e não queue:work:
+  # o listen sobe um processo por job e sempre usa o código atual.
+  painel-worker:
+    <<: *painel
+    container_name: la-carte-painel-worker
+    command: ["php", "artisan", "queue:listen", "--tries=3"]
+    depends_on:
+      painel-setup:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # PWA do cardápio (Vite dev server).
+  cardapio:
+    image: node:24
+    container_name: la-carte-cardapio
+    working_dir: /app
+    # npm ci só quando o package-lock.json mudou desde a última instalação.
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        hash=$$(sha1sum package-lock.json | cut -d' ' -f1)
+        if [ "$$(cat node_modules/.lock-hash 2>/dev/null)" != "$$hash" ]; then
+          echo "[cardapio] npm ci"
+          npm ci
+          echo "$$hash" > node_modules/.lock-hash
+        fi
+        exec npx vite --host 0.0.0.0 --port 5173
+    environment:
+      # Ganha de cardapio/.env.local: a PWA do stack sempre lê o MinIO local.
+      VITE_SNAPSHOT_BASE_URL: http://127.0.0.1:9000/la-carte
+      # Bind mount do Windows não propaga eventos de arquivo: watcher por polling.
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./cardapio:/app
+      # Binários nativos do Vite são por sistema: os do Windows não rodam aqui.
+      - cardapio_node_modules:/app/node_modules
+    restart: unless-stopped
+
 volumes:
   pgdata:
   miniodata:
+  painel_vendor:
+  cardapio_node_modules:
