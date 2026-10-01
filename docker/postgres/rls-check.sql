@@ -8,7 +8,7 @@
 --
 -- Os ERROR saem pelo stderr e podem aparecer uma linha fora de ordem no terminal.
 --
--- Pré-requisito: php artisan migrate:fresh --seed --database=pgsql_owner
+-- Pré-requisito: banco só com o seed (docker compose down -v && docker compose up -d).
 -- (tenant 1 = Bar do Tonho, 18 itens; tenant 2 = Pizzaria da Nona, 5 itens).
 -- Compare cada resultado com o "ESPERADO" impresso logo acima dele.
 

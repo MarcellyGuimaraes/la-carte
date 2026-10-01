@@ -4,6 +4,15 @@
 # Qualquer falha encerra com código != 0, e o compose não sobe web nem worker.
 set -eu
 
+# APP_KEY de dev: gerada uma vez por máquina e guardada no volume painel_secrets.
+# Nunca no git. Some com `docker compose down -v`, junto com o banco.
+if [ ! -s /secrets/app_key ]; then
+    echo "[setup] gerando APP_KEY de dev"
+    php -r 'echo "base64:", base64_encode(random_bytes(32));' > /secrets/app_key
+fi
+APP_KEY="$(cat /secrets/app_key)"
+export APP_KEY
+
 echo "[setup] composer install"
 composer install --no-interaction --no-progress
 

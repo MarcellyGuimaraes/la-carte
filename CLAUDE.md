@@ -140,8 +140,10 @@ restrita. Desenhar isso de propósito — senão ou o painel da plataforma vem v
 
 **Regras firmes:**
 - `tenant_id` desde a primeira migration (já feito).
-- Testar isolamento de verdade: criar 2 tenants e confirmar que um não vê o outro,
-  **inclusive no nível de RLS** (não só no Filament).
+- Conferir isolamento de verdade: 2 tenants, um não vê o outro, **inclusive no
+  nível de RLS** (não só no Filament). Nesta fase não há suíte automatizada (ver
+  seção 11): ao mexer em tenancy, conferir à mão no stack local (login de cada
+  dono) e rodar `docker/postgres/rls-check.sql`.
 - Não usar schema-por-tenant nem banco-por-tenant (overkill nesta escala).
 
 ---
@@ -163,8 +165,8 @@ cliente e junta várias edições num job só.
   há versão nova.
 
 **Ponto único de falha:** todo o esquema depende dos **cache headers corretos**.
-`current.json` nunca pode ser cacheado; `v{n}.json` deve ser imutável. Testar isso
-explicitamente.
+`current.json` nunca pode ser cacheado; `v{n}.json` deve ser imutável. Ao mexer na
+publicação, conferir à mão: `curl.exe -I` nos dois arquivos do MinIO local.
 
 **Retenção — manter no máximo as 3 últimas `v{n}.json` por restaurante.** O próprio
 job do "Publicar" faz a faxina: ao gerar a nova `v{n}` e mover o ponteiro, apaga as
@@ -260,3 +262,8 @@ custam retrabalho se errados.
 - **Nomes claros e consistentes** (pt ou en, mas não misture).
 - Commits pequenos; cada passo do roteiro é um "pronto" que funciona sozinho.
 - Antes de adicionar biblioteca, justifique por que o que já existe não basta.
+- **Sem testes automatizados nesta fase.** Ambiente controlado e uma pessoa só no
+  código: a verificação é manual, no stack local (`docker compose up -d`), mais
+  `docker/postgres/rls-check.sql` para a RLS. Não criar suíte nem rodar baterias
+  longas. Testes voltam quando o produto estiver "pronto"; a suíte antiga pode
+  ser recuperada do commit `237469f` (`git checkout 237469f -- painel/tests`).

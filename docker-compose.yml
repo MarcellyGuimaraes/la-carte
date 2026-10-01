@@ -34,6 +34,8 @@ x-painel: &painel
     # existe no Linux. Montar a pasta real por cima dele faz /storage funcionar
     # sem rodar storage:link (que reescreveria o symlink no disco do host).
     - ./painel/storage/app/public:/var/www/html/public/storage
+    # APP_KEY de dev, gerada pelo painel-setup na primeira subida (nunca no git).
+    - painel_secrets:/secrets
   environment:
     # Caches do Laravel fora de bootstrap/cache/, que é compartilhado com o host:
     # um config:cache feito no host (com o .env de produção) seria lido aqui.
@@ -123,6 +125,7 @@ services:
       - ./docker/painel/.env.docker:/var/www/html/.env:ro
       - painel_vendor:/var/www/html/vendor
       - ./docker/painel/setup.sh:/setup.sh:ro
+      - painel_secrets:/secrets
     depends_on:
       postgres:
         condition: service_healthy
@@ -131,10 +134,12 @@ services:
     restart: "no"
 
   # Painel web. O servidor embutido relê o PHP a cada request: editar e recarregar.
+  # --no-reload: sem ele o serve descarta variáveis de ambiente (APP_KEY inclusa)
+  # ao subir o processo filho. Mudou o .env.docker? `docker compose restart painel`.
   painel:
     <<: *painel
     container_name: la-carte-painel
-    command: ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+    command: ["sh", "-c", "export APP_KEY=\"$$(cat /secrets/app_key)\" && exec php artisan serve --host=0.0.0.0 --port=8000 --no-reload"]
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -147,7 +152,7 @@ services:
   painel-worker:
     <<: *painel
     container_name: la-carte-painel-worker
-    command: ["php", "artisan", "queue:listen", "--tries=3"]
+    command: ["sh", "-c", "export APP_KEY=\"$$(cat /secrets/app_key)\" && exec php artisan queue:listen --tries=3"]
     depends_on:
       painel-setup:
         condition: service_completed_successfully
@@ -188,4 +193,5 @@ volumes:
   pgdata:
   miniodata:
   painel_vendor:
+  painel_secrets:
   cardapio_node_modules:
