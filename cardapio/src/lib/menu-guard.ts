@@ -1,4 +1,4 @@
-import type { Category, Menu, MenuItem, Tenant } from '../types/menu'
+import type { Branding, Category, Menu, MenuItem, Tenant } from '../types/menu'
 
 /**
  * Confere em tempo de execução que um JSON é mesmo um Menu.
@@ -53,10 +53,27 @@ function isCategory(value: unknown): value is Category {
   )
 }
 
+const HEX_COLOR = /^#[0-9a-f]{6}$/
+
+/*
+ * Cor fora do formato não chega ao CSS: o snapshot inteiro é recusado, como
+ * qualquer outro campo errado, e a mesa fica com a versão anterior.
+ */
+function isBranding(value: unknown): value is Branding {
+  return (
+    isObject(value) &&
+    (value.theme === 'dark' || value.theme === 'light') &&
+    (value.brand_color === null || (typeof value.brand_color === 'string' && HEX_COLOR.test(value.brand_color))) &&
+    isNullableString(value.logo_url)
+  )
+}
+
 export function isMenu(value: unknown): value is Menu {
   return (
     isObject(value) &&
     isTenant(value.tenant) &&
+    /* Opcional: snapshots de antes do whitelabel não têm, e seguem válidos. */
+    (value.branding === undefined || isBranding(value.branding)) &&
     typeof value.generated_at === 'string' &&
     Array.isArray(value.categories) &&
     value.categories.every(isCategory)

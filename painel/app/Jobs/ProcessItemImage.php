@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\ConvertsToWebp;
 use App\Jobs\Concerns\RunsAsTenant;
 use App\Models\Item;
 use GdImage;
@@ -21,15 +22,12 @@ use RuntimeException;
  */
 class ProcessItemImage implements ShouldQueue
 {
-    use Queueable, RunsAsTenant;
+    use ConvertsToWebp, Queueable, RunsAsTenant;
 
     /** 400 para a lista, 800 é o padrão (image_url), 1200 para tela grande. */
     public const WIDTHS = [400, 800, 1200];
 
     public const DEFAULT_WIDTH = 800;
-
-    /** 80 é o ponto em que o WebP para de ganhar tamanho sem perda visível. */
-    private const QUALITY = 80;
 
     /** Retentar ajuda em falha de storage; imagem ilegível falha na hora. */
     public int $tries = 3;
@@ -42,15 +40,6 @@ class ProcessItemImage implements ShouldQueue
         public readonly int $itemId,
         public readonly string $imagePath,
     ) {}
-
-    /** Onde fica cada tamanho: foto.jpg vira foto-400.webp, foto-800.webp... */
-    public static function variantPath(string $imagePath, int $width): string
-    {
-        $info = pathinfo($imagePath);
-        $directory = $info['dirname'] === '.' ? '' : $info['dirname'].'/';
-
-        return "{$directory}{$info['filename']}-{$width}.webp";
-    }
 
     public function handle(): void
     {
@@ -78,7 +67,7 @@ class ProcessItemImage implements ShouldQueue
         }
 
         foreach (self::WIDTHS as $width) {
-            $this->store(self::variantPath($this->imagePath, $width), $this->toWebp($source, $width));
+            $this->store(self::variantPath($this->imagePath, $width), $this->toWebp($source, $width, $this->imagePath));
         }
 
         $url = Storage::disk(config('filesystems.media_disk'))
@@ -113,43 +102,7 @@ class ProcessItemImage implements ShouldQueue
             throw new RuntimeException("Foto original não encontrada: [{$this->imagePath}].");
         }
 
-        /* @ porque o GD avisa com warning; o erro explícito é o null. */
-        $image = @imagecreatefromstring($bytes);
-
-        if ($image === false) {
-            return null;
-        }
-
-        /* PNG com paleta não vira WebP: o GD exige truecolor. */
-        imagepalettetotruecolor($image);
-
-        return $image;
-    }
-
-    /** Nunca amplia: foto pequena fica no tamanho dela, só muda de formato. */
-    private function toWebp(GdImage $source, int $width): string
-    {
-        $sourceWidth = imagesx($source);
-        $sourceHeight = imagesy($source);
-        $targetWidth = min($width, $sourceWidth);
-        $targetHeight = max(1, (int) round($sourceHeight * $targetWidth / $sourceWidth));
-
-        $target = imagecreatetruecolor($targetWidth, $targetHeight);
-        /* Mantém a transparência de PNG. */
-        imagealphablending($target, false);
-        imagesavealpha($target, true);
-        /* resampled em vez de imagescale: reduz com qualidade bem melhor. */
-        imagecopyresampled($target, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, $sourceWidth, $sourceHeight);
-
-        ob_start();
-        $ok = imagewebp($target, null, self::QUALITY);
-        $webp = ob_get_clean();
-
-        if (! $ok || $webp === false || $webp === '') {
-            throw new RuntimeException("Falha ao gerar WebP de {$width}px para [{$this->imagePath}].");
-        }
-
-        return $webp;
+        return $this->decodeImage($bytes);
     }
 
     private function store(string $path, string $contents): void

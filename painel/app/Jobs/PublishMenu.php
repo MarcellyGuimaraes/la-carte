@@ -192,6 +192,16 @@ class PublishMenu implements ShouldQueue
                 'name' => $tenant->name,
                 'slug' => $tenant->slug,
             ],
+            /*
+             * Whitelabel. Viaja no v{n}.json, não num arquivo à parte: a marca
+             * fica imutável junto com o cardápio que ela veste, abre offline
+             * igual e não custa request extra na mesa.
+             */
+            'branding' => [
+                'theme' => $tenant->theme->value,
+                'brand_color' => $tenant->brand_color,
+                'logo_url' => $tenant->logo_url,
+            ],
             'generated_at' => now()->utc()->toIso8601ZuluString(),
             'categories' => $categories->map(fn (Category $category): array => [
                 'id' => $category->id,

@@ -78,8 +78,10 @@ class PublishMenuTest extends TestCase
         $this->publish($this->tonho);
         $menu = $this->readJson(PublishMenu::versionPath(self::SLUG, 1));
 
-        $this->assertSame(['tenant', 'generated_at', 'categories'], array_keys($menu));
+        $this->assertSame(['tenant', 'branding', 'generated_at', 'categories'], array_keys($menu));
         $this->assertSame(['id' => $this->tonho, 'name' => self::SLUG, 'slug' => self::SLUG], $menu['tenant']);
+        /* Sem marca escolhida: tema escuro, cor e logo padrão. */
+        $this->assertSame(['theme' => 'dark', 'brand_color' => null, 'logo_url' => null], $menu['branding']);
         $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $menu['generated_at']);
 
         $items = $menu['categories'][0]['items'];

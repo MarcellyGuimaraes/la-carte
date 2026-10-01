@@ -292,6 +292,6 @@ class PublishMenuResilienceTest extends TestCase
 
         $menu = json_decode($raw, true);
         $this->assertIsArray($menu, "v{$version}.json não é JSON válido");
-        $this->assertSame(['tenant', 'generated_at', 'categories'], array_keys($menu), "v{$version}.json fora do contrato");
+        $this->assertSame(['tenant', 'branding', 'generated_at', 'categories'], array_keys($menu), "v{$version}.json fora do contrato");
     }
 }

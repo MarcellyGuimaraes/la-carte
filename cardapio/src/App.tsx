@@ -1,6 +1,8 @@
 import type { Menu } from './types/menu'
 import { useMenu } from './data/use-menu'
 import { byOrder } from './lib/menu'
+import { DEFAULT_BRANDING } from './lib/branding'
+import { useBranding } from './lib/use-branding'
 import { slugFromPath } from './lib/slug'
 import { CategoryNav } from './components/CategoryNav'
 import { CategorySection } from './components/CategorySection'
@@ -61,10 +63,17 @@ function formatUpdatedAt(iso: string): string {
 
 function MenuView({ menu, version }: { menu: Menu; version: number }) {
   const categories = byOrder(menu.categories)
+  const branding = menu.branding ?? DEFAULT_BRANDING
+
+  useBranding(branding)
 
   return (
     <div className="app">
       <header className="header">
+        {branding.logo_url && (
+          /* O nome continua no h1 logo abaixo: o alt vazio evita lê-lo duas vezes. */
+          <img className="header__logo" src={branding.logo_url} alt="" decoding="async" />
+        )}
         <h1 className="header__title">{menu.tenant.name}</h1>
         <p className="header__updated">
           Cardápio atualizado em {formatUpdatedAt(menu.generated_at)}

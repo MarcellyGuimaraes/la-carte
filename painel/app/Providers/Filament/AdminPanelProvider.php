@@ -2,8 +2,11 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Tenancy\EditBranding;
+use App\Http\Middleware\ApplyTenantBranding;
 use App\Http\Middleware\SetPostgresTenant;
 use App\Models\Tenant;
+use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -36,6 +39,14 @@ class AdminPanelProvider extends PanelProvider
              * a RLS no Postgres é a última.
              */
             ->tenant(Tenant::class, slugAttribute: 'slug')
+            /* Whitelabel: cor, tema e logo. Vira "Marca do restaurante" no menu do tenant. */
+            ->tenantProfile(EditBranding::class)
+            /*
+             * Logo do restaurante no topo do painel; sem logo, o nome. Closure
+             * porque o tenant só existe na request (avaliada na renderização).
+             */
+            ->brandLogo(fn (): ?string => Filament::getTenant()?->logo_url)
+            ->brandLogoHeight('2.5rem')
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -67,6 +78,10 @@ class AdminPanelProvider extends PanelProvider
                  * (salvar, filtrar, paginar), não só no carregamento da página.
                  */
                 SetPostgresTenant::class,
+            ], isPersistent: true)
+            /* Depois do IdentifyTenant: só aí se sabe a cor do restaurante. */
+            ->tenantMiddleware([
+                ApplyTenantBranding::class,
             ], isPersistent: true);
     }
 }

@@ -19,6 +19,30 @@ describe('isMenu', () => {
     expect(isMenu(menu)).toBe(true)
   })
 
+  it('aceita snapshot sem branding (publicado antes do whitelabel)', () => {
+    expect(menuFixture().branding).toBeUndefined()
+    expect(isMenu(menuFixture())).toBe(true)
+  })
+
+  it('aceita branding completo ou só com o tema', () => {
+    const branded = { ...menuFixture(), branding: { theme: 'light', brand_color: '#1a2b5c', logo_url: 'https://cdn.test/logo-512.webp' } }
+    const plain = { ...menuFixture(), branding: { theme: 'dark', brand_color: null, logo_url: null } }
+
+    expect(isMenu(branded)).toBe(true)
+    expect(isMenu(plain)).toBe(true)
+  })
+
+  it.each([
+    ['tema desconhecido', { theme: 'neon', brand_color: null, logo_url: null }],
+    ['cor sem #', { theme: 'dark', brand_color: '1a2b5c', logo_url: null }],
+    ['cor com CSS a mais', { theme: 'dark', brand_color: '#1a2b5c; background: url(x)', logo_url: null }],
+    ['cor em maiúsculas', { theme: 'dark', brand_color: '#1A2B5C', logo_url: null }],
+    ['logo numérico', { theme: 'dark', brand_color: null, logo_url: 3 }],
+    ['branding nulo', null],
+  ])('rejeita branding com %s', (_, branding) => {
+    expect(isMenu({ ...menuFixture(), branding })).toBe(false)
+  })
+
   it.each([
     ['null', null],
     ['texto', 'oi'],

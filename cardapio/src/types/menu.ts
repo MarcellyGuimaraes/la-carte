@@ -17,6 +17,18 @@ export type Tenant = {
   slug: string
 }
 
+/** Paletas prontas da PWA (index.css). Espelha o enum Theme do painel. */
+export type Theme = 'dark' | 'light'
+
+/** Whitelabel: a marca do restaurante, publicada junto com o cardápio. */
+export type Branding = {
+  theme: Theme
+  /** `#rrggbb` minúsculo. `null` = cor padrão do tema. */
+  brand_color: string | null
+  /** URL absoluta do WebP do logo no CDN. `null` = sem logo. */
+  logo_url: string | null
+}
+
 export type MenuItem = {
   id: number
   name: string
@@ -42,6 +54,11 @@ export type Category = {
 
 export type Menu = {
   tenant: Tenant
+  /**
+   * Ausente nos snapshots publicados antes do whitelabel, que continuam no
+   * cache dos celulares: sem ela, vale a marca padrão.
+   */
+  branding?: Branding
   categories: Category[]
   /** Quando este snapshot foi gerado. Usado para exibir "atualizado em". */
   generated_at: string
