@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Migrations\TenantColumns;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -21,22 +22,21 @@ use Illuminate\Support\Facades\Schema;
  */
 return new class extends Migration
 {
+    /* Idempotente (TenantColumns): colunas podem já existir, criadas à mão no Neon. */
     public function up(): void
     {
-        Schema::table('tenants', function (Blueprint $table) {
-            /* Original enviado; o WebP sai do job ProcessTenantImage. */
-            $table->string('cover_path')->nullable()->after('logo_url');
-            /* URL final do WebP no CDN; é o que vai para o snapshot. */
-            $table->string('cover_url')->nullable()->after('cover_path');
-            /* O próprio varchar(140) é o limite no banco. */
-            $table->string('tagline', 140)->nullable()->after('cover_url');
-        });
+        /* Original enviado; o WebP sai do job ProcessTenantImage. */
+        TenantColumns::ensure('cover_path', 'varchar(255)');
+        /* URL final do WebP no CDN; é o que vai para o snapshot. */
+        TenantColumns::ensure('cover_url', 'varchar(255)');
+        /* O próprio varchar(140) é o limite no banco. */
+        TenantColumns::ensure('tagline', 'varchar(140)');
 
         /*
          * Slogan vazio é null, nunca ''. Sem isso, '' e null publicariam
          * snapshots diferentes para o mesmo cardápio (versão nova à toa).
          */
-        DB::statement("ALTER TABLE tenants ADD CONSTRAINT tenants_tagline_not_blank CHECK (tagline IS NULL OR btrim(tagline) <> '')");
+        TenantColumns::ensureCheck('tenants_tagline_not_blank', "tagline IS NULL OR btrim(tagline) <> ''");
     }
 
     public function down(): void
