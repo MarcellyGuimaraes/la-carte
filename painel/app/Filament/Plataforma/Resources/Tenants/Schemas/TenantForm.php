@@ -3,6 +3,7 @@
 namespace App\Filament\Plataforma\Resources\Tenants\Schemas;
 
 use App\Enums\Plan;
+use App\Filament\Schemas\BrandingFields;
 use App\Models\Tenant;
 use App\Models\User;
 use Filament\Forms\Components\Select;
@@ -16,6 +17,7 @@ use Illuminate\Support\Str;
 
 /**
  * Onboarding de restaurante: o restaurante e o usuário-dono num formulário só.
+ * A marca já pode sair pronta daqui (tema, cor e slogan; logo e capa na edição).
  *
  * Os campos do dono existem só na criação; quem grava as duas coisas juntas,
  * numa transação, é a página CreateTenant.
@@ -62,6 +64,20 @@ class TenantForm
                             ->default(true)
                             ->helperText('Desativado, o dono não entra no painel.'),
                     ]),
+                /*
+                 * Mesmos campos da "Marca do restaurante" do /admin. Logo e
+                 * capa só na edição: o upload vai para a pasta do id, que não
+                 * existe antes de criar.
+                 */
+                Section::make('Marca')
+                    ->description('Ao salvar, vai direto para o cardápio das mesas, se o restaurante já tiver um cardápio publicado.')
+                    ->schema([
+                        ...BrandingFields::basic(),
+                        ...BrandingFields::images(),
+                    ]),
+                Section::make('Contatos no cardápio')
+                    ->columns(3)
+                    ->schema(BrandingFields::contacts()),
                 Section::make('Dono')
                     ->description('A pessoa que vai gerenciar o cardápio. Repasse a senha inicial para ela.')
                     ->columns(2)

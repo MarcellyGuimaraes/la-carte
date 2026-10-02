@@ -77,9 +77,13 @@ export default defineConfig({
       },
 
       manifest: {
-        name: 'Bar do Tonho — Cardápio',
+        /*
+         * Neutro: é o mesmo app para todos os restaurantes. O nome de cada um
+         * entra no título da aba depois de o cardápio carregar (use-branding).
+         */
+        name: 'Cardápio',
         short_name: 'Cardápio',
-        description: 'Cardápio digital do Bar do Tonho.',
+        description: 'Cardápio digital do restaurante.',
         lang: 'pt-BR',
         start_url: '.',
         display: 'standalone',

@@ -28,6 +28,14 @@ class CreateTenant extends CreateRecord
                 'slug' => $data['slug'],
                 'plan' => $data['plan'],
                 'active' => $data['active'],
+                /* Marca e contatos (BrandingFields). Logo e capa só na edição. */
+                'theme' => $data['theme'],
+                'brand_color' => $data['brand_color'] ?? null,
+                'secondary_color' => $data['secondary_color'] ?? null,
+                'tagline' => $data['tagline'] ?? null,
+                'whatsapp' => $data['whatsapp'] ?? null,
+                'instagram' => $data['instagram'] ?? null,
+                'address' => $data['address'] ?? null,
             ]);
 
             $tenant->users()->create([

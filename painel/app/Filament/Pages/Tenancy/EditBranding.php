@@ -2,18 +2,15 @@
 
 namespace App\Filament\Pages\Tenancy;
 
-use App\Enums\Theme;
-use Filament\Facades\Filament;
-use Filament\Forms\Components\ColorPicker;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\ToggleButtons;
+use App\Filament\Schemas\BrandingFields;
 use Filament\Pages\Tenancy\EditTenantProfile;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Whitelabel: o dono escolhe cor, tema e logo do restaurante.
+ * Whitelabel: o dono escolhe tema, cor, slogan, logo e capa do restaurante.
+ * Os campos são os mesmos do /plataforma (BrandingFields).
  *
  * É a página de "perfil do tenant" do Filament (menu do restaurante, no topo).
  * Grava na linha do tenant, que está sob a RLS: o dono só alcança a dele.
@@ -37,44 +34,25 @@ class EditBranding extends EditTenantProfile
         return auth()->user()?->tenant_id === $tenant->getKey();
     }
 
+    /* Diz o que acontece de fato: salvar já publica a marca (Tenant::booted). */
+    protected function getSavedNotificationTitle(): ?string
+    {
+        return 'Marca salva e enviada para o cardápio';
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema
             ->components([
                 Section::make('Aparência do cardápio')
-                    ->description('Vale para as mesas depois de "Publicar cardápio". O painel muda na hora.')
+                    ->description('Ao salvar, vai direto para o cardápio das mesas em alguns segundos (logo e capa novos, assim que terminarem de processar). Itens e categorias continuam esperando o "Publicar cardápio".')
                     ->schema([
-                        ToggleButtons::make('theme')
-                            ->label('Tema')
-                            ->options(Theme::class)
-                            ->inline()
-                            ->required(),
-                        /*
-                         * Vazio = cor padrão do La Carte. Minúsculo para bater
-                         * com o CHECK do banco e o snapshot não mudar só por
-                         * caixa da letra (o que geraria versão nova à toa).
-                         */
-                        ColorPicker::make('brand_color')
-                            ->label('Cor da marca')
-                            ->regex('/^#[0-9a-fA-F]{6}$/')
-                            ->dehydrateStateUsing(fn (?string $state): ?string => blank($state) ? null : strtolower($state))
-                            ->helperText('Usada em destaques e botões. Deixe vazio para a cor padrão.'),
-                        FileUpload::make('logo_path')
-                            ->label('Logo')
-                            ->image()
-                            /*
-                             * Mesmas travas da foto do item (ver ItemForm): sem
-                             * SVG, conteúdo conferido de verdade e caminho que o
-                             * cliente não consegue trocar no estado do Livewire.
-                             */
-                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                            ->rule('dimensions:min_width=1,min_height=1')
-                            ->preventFilePathTampering()
-                            ->disk('public')
-                            ->directory(fn (): string => 'logos/'.Filament::getTenant()->getKey())
-                            ->maxSize(2048)
-                            ->helperText('PNG com fundo transparente fica melhor nos dois temas.'),
+                        ...BrandingFields::basic(),
+                        ...BrandingFields::images(),
                     ]),
+                Section::make('Contatos no cardápio')
+                    ->description('Aparecem como links no rodapé do cardápio. Deixe vazio o que não quiser mostrar.')
+                    ->schema(BrandingFields::contacts()),
             ]);
     }
 }

@@ -1,4 +1,4 @@
-import type { Branding, Category, Menu, MenuItem, Tenant } from '../types/menu'
+import type { Category, Contacts, Menu, MenuItem, PublishedBranding, Tenant } from '../types/menu'
 
 /**
  * Confere em tempo de execução que um JSON é mesmo um Menu.
@@ -55,16 +55,41 @@ function isCategory(value: unknown): value is Category {
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/
 
+/** Ausente vale: snapshots da primeira versão do whitelabel não têm o campo. */
+const isOptionalNullableString = (value: unknown): boolean => value === undefined || isNullableString(value)
+
 /*
  * Cor fora do formato não chega ao CSS: o snapshot inteiro é recusado, como
  * qualquer outro campo errado, e a mesa fica com a versão anterior.
  */
-function isBranding(value: unknown): value is Branding {
+const isNullableMatch = (value: unknown, pattern: RegExp): boolean =>
+  value === null || (typeof value === 'string' && pattern.test(value))
+
+function isBranding(value: unknown): value is PublishedBranding {
   return (
     isObject(value) &&
     (value.theme === 'dark' || value.theme === 'light') &&
-    (value.brand_color === null || (typeof value.brand_color === 'string' && HEX_COLOR.test(value.brand_color))) &&
-    isNullableString(value.logo_url)
+    isNullableMatch(value.brand_color, HEX_COLOR) &&
+    (value.secondary_color === undefined || isNullableMatch(value.secondary_color, HEX_COLOR)) &&
+    isNullableString(value.logo_url) &&
+    isOptionalNullableString(value.cover_url) &&
+    isOptionalNullableString(value.tagline)
+  )
+}
+
+/*
+ * Mesmos formatos dos CHECKs do banco. WhatsApp e Instagram entram em URL:
+ * fora do formato, o snapshot é recusado em vez de virar link estranho.
+ */
+const WHATSAPP = /^[0-9]{12,13}$/
+const INSTAGRAM = /^[a-z0-9._]{1,30}$/
+
+function isContacts(value: unknown): value is Contacts {
+  return (
+    isObject(value) &&
+    isNullableMatch(value.whatsapp, WHATSAPP) &&
+    isNullableMatch(value.instagram, INSTAGRAM) &&
+    isNullableString(value.address)
   )
 }
 
@@ -72,8 +97,9 @@ export function isMenu(value: unknown): value is Menu {
   return (
     isObject(value) &&
     isTenant(value.tenant) &&
-    /* Opcional: snapshots de antes do whitelabel não têm, e seguem válidos. */
+    /* Opcionais: snapshots de antes do whitelabel/dos contatos não têm, e seguem válidos. */
     (value.branding === undefined || isBranding(value.branding)) &&
+    (value.contacts === undefined || isContacts(value.contacts)) &&
     typeof value.generated_at === 'string' &&
     Array.isArray(value.categories) &&
     value.categories.every(isCategory)

@@ -1,12 +1,14 @@
 import type { Menu } from './types/menu'
 import { useMenu } from './data/use-menu'
 import { byOrder } from './lib/menu'
-import { DEFAULT_BRANDING } from './lib/branding'
+import { normalizeBranding } from './lib/branding'
 import { useBranding } from './lib/use-branding'
 import { slugFromPath } from './lib/slug'
 import { CategoryNav } from './components/CategoryNav'
 import { CategorySection } from './components/CategorySection'
 import { PwaStatus } from './components/PwaStatus'
+import { ContactLinks } from './components/ContactLinks'
+import { normalizeContacts } from './lib/contacts'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 /**
@@ -63,18 +65,24 @@ function formatUpdatedAt(iso: string): string {
 
 function MenuView({ menu, version }: { menu: Menu; version: number }) {
   const categories = byOrder(menu.categories)
-  const branding = menu.branding ?? DEFAULT_BRANDING
+  /* Snapshots antigos chegam sem branding, ou sem capa/slogan: completa com o padrão. */
+  const branding = normalizeBranding(menu.branding)
 
-  useBranding(branding)
+  useBranding(branding, menu.tenant.name)
 
   return (
     <div className="app">
       <header className="header">
+        {branding.cover_url && (
+          /* Decorativa: o restaurante já é nomeado no h1. */
+          <img className="header__cover" src={branding.cover_url} alt="" decoding="async" />
+        )}
         {branding.logo_url && (
           /* O nome continua no h1 logo abaixo: o alt vazio evita lê-lo duas vezes. */
           <img className="header__logo" src={branding.logo_url} alt="" decoding="async" />
         )}
         <h1 className="header__title">{menu.tenant.name}</h1>
+        {branding.tagline && <p className="header__tagline">{branding.tagline}</p>}
         <p className="header__updated">
           Cardápio atualizado em {formatUpdatedAt(menu.generated_at)}
         </p>
@@ -89,6 +97,7 @@ function MenuView({ menu, version }: { menu: Menu; version: number }) {
       </main>
 
       <footer className="footer">
+        <ContactLinks contacts={normalizeContacts(menu.contacts)} />
         <p>Preços sujeitos a alteração. Consulte o garçom.</p>
         {showDiagnostics() && (
           <>

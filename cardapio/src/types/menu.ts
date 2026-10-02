@@ -20,13 +20,43 @@ export type Tenant = {
 /** Paletas prontas da PWA (index.css). Espelha o enum Theme do painel. */
 export type Theme = 'dark' | 'light'
 
-/** Whitelabel: a marca do restaurante, publicada junto com o cardápio. */
+/**
+ * Whitelabel: a marca do restaurante, publicada junto com o cardápio.
+ * Gerada em PublishMenu::snapshot() (painel/app/Jobs/PublishMenu.php).
+ */
 export type Branding = {
   theme: Theme
-  /** `#rrggbb` minúsculo. `null` = cor padrão do tema. */
+  /** Cor PRIMÁRIA (o nome ficou da 1ª versão). `#rrggbb` minúsculo. `null` = cor padrão do tema. */
   brand_color: string | null
+  /** Cor secundária: selo de destaque e preço. `null` = usa a primária. */
+  secondary_color: string | null
   /** URL absoluta do WebP do logo no CDN. `null` = sem logo. */
   logo_url: string | null
+  /** URL absoluta do WebP da capa (banner do topo). `null` = sem capa. */
+  cover_url: string | null
+  /** Frase curta abaixo do nome, até 140 caracteres. `null` = sem slogan. */
+  tagline: string | null
+}
+
+/**
+ * Branding como pode chegar no snapshot: os da primeira versão do whitelabel
+ * (ainda em cache nos celulares e no storage) não têm capa, slogan nem cor
+ * secundária. `normalizeBranding` (lib/branding.ts) completa o que falta.
+ */
+type LaterBrandingFields = 'cover_url' | 'tagline' | 'secondary_color'
+export type PublishedBranding = Omit<Branding, LaterBrandingFields> & Partial<Pick<Branding, LaterBrandingFields>>
+
+/**
+ * Contatos do rodapé. Já normalizados no painel e conferidos pelo banco; a
+ * PWA confere de novo (menu-guard) porque eles viram URL.
+ */
+export type Contacts = {
+  /** Só dígitos, com DDI: `5511999998888`. Vira https://wa.me/<isto>. */
+  whatsapp: string | null
+  /** Usuário sem @, minúsculo. Vira https://instagram.com/<isto>. */
+  instagram: string | null
+  /** Texto livre; vira busca no Google Maps. */
+  address: string | null
 }
 
 export type MenuItem = {
@@ -58,7 +88,9 @@ export type Menu = {
    * Ausente nos snapshots publicados antes do whitelabel, que continuam no
    * cache dos celulares: sem ela, vale a marca padrão.
    */
-  branding?: Branding
+  branding?: PublishedBranding
+  /** Ausente nos snapshots anteriores aos contatos: sem ela, rodapé sem links. */
+  contacts?: Contacts
   categories: Category[]
   /** Quando este snapshot foi gerado. Usado para exibir "atualizado em". */
   generated_at: string

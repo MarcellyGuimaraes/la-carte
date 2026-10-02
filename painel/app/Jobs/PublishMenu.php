@@ -22,6 +22,12 @@ use Throwable;
  *
  * Todo o offline depende destes dois headers. Eles viajam como metadado do
  * objeto no S3/R2 (MinIO em dev), por isso o disco precisa ser s3.
+ *
+ * Dois modos, o mesmo caminho de gravação (lock, versão, conferência, faxina):
+ * - completo (botão "Publicar cardápio"): cardápio e marca do rascunho;
+ * - só marca (PublishMenu::branding, disparado ao salvar a marca): parte da
+ *   versão que está no ar e troca só branding e contacts. Marca e cardápio são
+ *   publicações separadas: salvar a cor não leva junto um preço em rascunho.
  */
 class PublishMenu implements ShouldQueue
 {
@@ -43,7 +49,16 @@ class PublishMenu implements ShouldQueue
     /** @var list<int> */
     public array $backoff = [10, 60];
 
-    public function __construct(public readonly int $tenantId) {}
+    public function __construct(
+        public readonly int $tenantId,
+        public readonly bool $brandingOnly = false,
+    ) {}
+
+    /** Só a marca, sobre o cardápio que já está no ar. */
+    public static function branding(int $tenantId): self
+    {
+        return new self($tenantId, brandingOnly: true);
+    }
 
     public static function versionPath(string $slug, int $version): string
     {
@@ -88,8 +103,16 @@ class PublishMenu implements ShouldQueue
         }
 
         $disk = Storage::disk(config('filesystems.snapshot_disk'));
-        $snapshot = $this->snapshot($tenant);
         $published = $this->publishedVersion($disk, $tenant->slug);
+
+        if ($this->brandingOnly && $published === null) {
+            /* Nada no ar para vestir: a marca entra no primeiro "Publicar cardápio". */
+            return $tenant->slug;
+        }
+
+        $snapshot = $this->brandingOnly
+            ? $this->withBranding($published['menu'], $tenant)
+            : $this->snapshot($tenant);
 
         /*
          * Idempotência: nada mudou desde a versão no ar, então não há o que
@@ -192,16 +215,8 @@ class PublishMenu implements ShouldQueue
                 'name' => $tenant->name,
                 'slug' => $tenant->slug,
             ],
-            /*
-             * Whitelabel. Viaja no v{n}.json, não num arquivo à parte: a marca
-             * fica imutável junto com o cardápio que ela veste, abre offline
-             * igual e não custa request extra na mesa.
-             */
-            'branding' => [
-                'theme' => $tenant->theme->value,
-                'brand_color' => $tenant->brand_color,
-                'logo_url' => $tenant->logo_url,
-            ],
+            'branding' => $this->brandingOf($tenant),
+            'contacts' => $this->contactsOf($tenant),
             'generated_at' => now()->utc()->toIso8601ZuluString(),
             'categories' => $categories->map(fn (Category $category): array => [
                 'id' => $category->id,
@@ -218,6 +233,69 @@ class PublishMenu implements ShouldQueue
                     'sort_order' => $item->sort_order,
                 ])->all(),
             ])->all(),
+        ];
+    }
+
+    /**
+     * Whitelabel. Viaja no v{n}.json, não num arquivo à parte: a marca fica
+     * imutável junto com o cardápio que ela veste, abre offline igual e não
+     * custa request extra na mesa. Só as URLs dos WebP: logo_path e cover_path
+     * (originais) ficam de fora.
+     *
+     * @return array<string, mixed>
+     */
+    private function brandingOf(Tenant $tenant): array
+    {
+        return [
+            'theme' => $tenant->theme->value,
+            /* A cor primária: o nome ficou da primeira versão do contrato. */
+            'brand_color' => $tenant->brand_color,
+            'secondary_color' => $tenant->secondary_color,
+            'logo_url' => $tenant->logo_url,
+            'cover_url' => $tenant->cover_url,
+            'tagline' => $tenant->tagline,
+        ];
+    }
+
+    /**
+     * Contatos do rodapé. Fora do branding porque não são marca visual, mas
+     * editados na mesma página e publicados junto com ela (modo só-marca).
+     * Já normalizados no banco (CHECKs): a PWA só monta os links.
+     *
+     * @return array<string, mixed>
+     */
+    private function contactsOf(Tenant $tenant): array
+    {
+        return [
+            'whatsapp' => $tenant->whatsapp,
+            'instagram' => $tenant->instagram,
+            'address' => $tenant->address,
+        ];
+    }
+
+    /**
+     * A versão no ar com a marca e os contatos do banco. Remonta na mesma ordem de chaves do
+     * snapshot(): a idempotência compara JSON, e só a ordem diferente faria o
+     * próximo "Publicar cardápio" gerar versão à toa. generated_at fica: a data
+     * "atualizado em" fala do cardápio, que não mudou.
+     *
+     * @param  array<string, mixed>  $published
+     * @return array<string, mixed>
+     */
+    private function withBranding(array $published, Tenant $tenant): array
+    {
+        foreach (['tenant', 'generated_at', 'categories'] as $key) {
+            if (! array_key_exists($key, $published)) {
+                throw new RuntimeException("Versão no ar de [{$tenant->slug}] sem [{$key}]: publique o cardápio completo.");
+            }
+        }
+
+        return [
+            'tenant' => $published['tenant'],
+            'branding' => $this->brandingOf($tenant),
+            'contacts' => $this->contactsOf($tenant),
+            'generated_at' => $published['generated_at'],
+            'categories' => $published['categories'],
         ];
     }
 

@@ -13,8 +13,16 @@
   --text: #f5efe8;
   --text-muted: #b3a79b;
   --accent: #e8a13a;
+  /* A cor de destaque usada como TEXTO. Sem marca, a mesma; com marca, a PWA
+     ajusta a luminosidade para passar de 4.5:1 (lib/branding.ts). */
+  --accent-text: #e8a13a;
   /* Texto sobre --accent. Com cor de marca, a PWA calcula (lib/branding.ts). */
   --on-accent: #14110f;
+  /* Cor secundária (selo de destaque, preço). Sem marca, a mesma do destaque:
+     o visual padrão não muda. Com marca, lib/branding.ts sobrescreve. */
+  --secondary: var(--accent);
+  --secondary-text: var(--accent-text);
+  --on-secondary: var(--on-accent);
   --border: #332c26;
 
   /* Altura reservada para a barra de categorias fixa no topo. */
@@ -29,8 +37,8 @@
 /*
  * Tema claro (whitelabel). O escuro acima é o padrão: é o que aparece enquanto
  * o cardápio carrega e em snapshots anteriores ao whitelabel. O atributo vem
- * do snapshot (lib/use-branding.ts); a cor da marca, quando há, sobrescreve
- * --accent por cima de qualquer um dos dois.
+ * do snapshot (lib/use-branding.ts); a cor da marca, quando há, sobrescreve a
+ * paleta inteira (fundo, superfícies, borda e destaques) derivada dela.
  */
 :root[data-theme='light'] {
   --bg: #faf7f2;
@@ -40,6 +48,7 @@
   --text-muted: #6b6159;
   /* O âmbar do escuro some no fundo claro; este passa de 4.5:1. */
   --accent: #9a5b00;
+  --accent-text: #9a5b00;
   --on-accent: #ffffff;
   --border: #e4ddd4;
 
@@ -72,6 +81,21 @@ body {
   padding-bottom: 1rem;
 }
 
+/*
+ * Capa do restaurante: faixa de ponta a ponta no topo (anula o padding de
+ * .app). Altura limitada para a barra de categorias continuar na primeira
+ * tela de um celular pequeno.
+ */
+.header__cover {
+  display: block;
+  width: calc(100% + 2rem);
+  max-width: none;
+  height: clamp(7rem, 28vw, 9rem);
+  margin: -1.25rem -1rem 1rem;
+  object-fit: cover;
+  background: var(--surface-raised);
+}
+
 /* Logo do restaurante: altura fixa, largura livre (logo costuma ser largo). */
 .header__logo {
   display: block;
@@ -87,6 +111,12 @@ body {
   font-size: 1.625rem;
   line-height: 1.2;
   letter-spacing: -0.02em;
+}
+
+.header__tagline {
+  margin: 0.25rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
 }
 
 .header__updated {
@@ -133,7 +163,8 @@ body {
   padding: 0 0.875rem;
   border-radius: 1.5rem;
   background: var(--surface);
-  color: var(--text);
+  /* A marca na barra: o texto em --accent-text (contraste já garantido sobre --surface). */
+  color: var(--accent-text);
   font-size: 0.9375rem;
   font-weight: 600;
   text-decoration: none;
@@ -141,7 +172,8 @@ body {
 }
 
 .nav__link:active {
-  background: var(--surface-raised);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 /* Categorias */
@@ -158,7 +190,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .category__items {
@@ -220,8 +252,8 @@ body {
   margin-left: 0.5rem;
   padding: 0.125rem 0.4rem;
   border-radius: 0.25rem;
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--secondary);
+  color: var(--on-secondary);
   font-size: 0.625rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -251,6 +283,7 @@ body {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   white-space: nowrap;
+  color: var(--secondary-text);
 }
 
 /* Rodapé */
@@ -266,6 +299,32 @@ body {
 
 .footer p {
   margin: 0;
+}
+
+/* Contatos do restaurante: links tocáveis (~44px), quebram linha se não couberem. */
+.contacts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.contacts__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  border-radius: 1.5rem;
+  background: var(--surface);
+  color: var(--accent-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  /* Endereço longo quebra dentro do botão em vez de estourar a largura. */
+  overflow-wrap: anywhere;
 }
 
 /* Estados de carregamento e erro */

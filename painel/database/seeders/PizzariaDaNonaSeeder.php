@@ -17,7 +17,19 @@ class PizzariaDaNonaSeeder extends Seeder
     {
         $tenant = Tenant::updateOrCreate(
             ['slug' => 'pizzaria-da-nona'],
-            ['name' => 'Pizzaria da Nona', 'plan' => 'free', 'active' => true],
+            [
+                'name' => 'Pizzaria da Nona',
+                'plan' => 'free',
+                'active' => true,
+                /* Whitelabel: a Nona tem marca; o Tonho fica no padrão. Os dois casos no dev. */
+                'theme' => 'light',
+                'brand_color' => '#b91c1c',
+                'secondary_color' => '#15803d',
+                'tagline' => 'Massa de fermentação natural desde 1987',
+                'whatsapp' => '5511999998888',
+                'instagram' => 'pizzariadanona',
+                'address' => 'Rua das Pizzas, 123 - São Paulo, SP',
+            ],
         );
 
         $tenant->users()->updateOrCreate(
